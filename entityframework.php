@@ -1,28 +1,19 @@
 <?php
 
-// echo 'host: ' . getenv('IP') . ', user: ' . getenv('C9_USER') . ', database: c9, port: ' . 3306 . '\n';
-
-// $db = new mysqli($servername, $username, $password, $database, $port);
-// if ($db->connect_error)
-// {
-//     http_response_code(500);
-//     echo 'Connection failed: ' . $db->connect_error . '\n';
-//     die();
-// }
-
 class EntityContext
 {
-    protected $connection = array(
+    public $filename = null;
+    public $connection = array(
         'host' => 'localhost',
         'user' => '',
         'password' => '',
         'database' => 'mysql',
         'port' => 3306
         );
-    protected $settings = array(
-        'updateOnConnect' => false
+    public $settings = array(
+        'alwaysRefreshSchema' => false
         );
-    protected $schema = null;
+    public $schema = null;
     protected $sql = null;
     function __construct($file = null)
     {
@@ -30,6 +21,7 @@ class EntityContext
         {
             if (is_string($file))
             {
+                $this->filename = $file;
                 $file = json_decode(file_get_contents($file), true);
             }
             else if (is_object($file))
@@ -37,9 +29,6 @@ class EntityContext
                 $file = get_object_vars($file);
             }
             
-            // echo json_encode($file, JSON_PRETTY_PRINT);
-            // var_dump($file);
-            // echo '<br />';
             if (!empty($file['connection']))
             {
                 $this->connection['host'] = !empty($file['connection']['host']) ? strval($file['connection']['host']) : $this->connection['host'];
@@ -51,11 +40,20 @@ class EntityContext
             
             if (!empty($file['settings']))
             {
-                $this->setUpdateOnConnect($file['settings']['updateOnConnect']);
+                $this->setAlwaysRefreshSchema($file['settings']['alwaysRefreshSchema']);
             }
             
             $this->reconnect();
-            $this->refresh();
+            if (empty($file['schema']) || $this->settings['alwaysRefreshSchema'])
+            {
+                $this->refreshSchema();
+            }
+            else
+            {
+                $this->schema = $file['schema'];
+            }
+            
+            $this->hookSchema();
         }
     }
     
@@ -64,7 +62,7 @@ class EntityContext
         $this->disconnect();
     }
     
-    function reconnect()
+    protected function reconnect()
     {
         $this->disconnect();
         if ($this->connection['host'] && $this->connection['user'])
@@ -78,7 +76,7 @@ class EntityContext
         }
     }
     
-    function disconnect()
+    protected function disconnect()
     {
         if (!empty($this->sql))
         {
@@ -87,14 +85,14 @@ class EntityContext
         }
     }
     
-    function refresh()
+    protected function refreshSchema()
     {
         if (empty($this->sql))
         {
             return;
         }
         
-        $schema = array(
+        $this->schema = array(
             'tables' => [],
             'links' => []
             );
@@ -102,27 +100,23 @@ class EntityContext
         foreach ($tables as $table)
         {
             $tableName = $table[0];
-            $table = array(
-                // 'name' => $table[0]
-                );
-            
+            $table = array();
             $columns = $this->sql->query('show columns in ' . $tableName);
             foreach ($columns as $column)
             {
+                preg_match_all('!\d+!', $column['Type'], $length);
                 $table[$column['Field']] = array(
-                    // 'name' => $column['Field'],
-                    'type' => $column['Type'],
+                    'type' => explode('(', $column['Type'])[0],
+                    'length' => intval(implode($length[0])),
                     'nullable' => $column['Null'] === 'YES' ? true : false,
                     // 'primary' => false
                     );
-                // var_dump($column);
             }
             
-            // var_dump($table);
-            $schema['tables'][$tableName] = $table;
+            $this->schema['tables'][$tableName] = $table;
         }
         
-        foreach ($schema['tables'] as $tableName => &$table)
+        foreach ($this->schema['tables'] as $tableName => &$table)
         {
             $keys = $this->sql->query('show keys in ' . $tableName);
             foreach ($keys as $key)
@@ -135,7 +129,7 @@ class EntityContext
                 {
                     $principal = $key['Table'];
                     $dependent = substr($key['Key_name'], 3);
-                    $schema['links'][$key['Key_name']] = array(
+                    $this->schema['links'][$key['Key_name']] = array(
                         'from' => array(
                             'table' => $principal,
                             'key' => $key['Column_name'],
@@ -149,21 +143,34 @@ class EntityContext
                             )
                         );
                 }
-                
-                // var_dump($key);
             }
             
             unset($table);
         }
         
-        echo json_encode($schema, JSON_PRETTY_PRINT);
+        if (!empty($this->filename))
+        {
+            $file = json_decode(file_get_contents($this->filename), true);
+            $file['schema'] = $this->schema;
+            file_put_contents($this->filename, json_encode($file, JSON_PRETTY_PRINT));
+        }
     }
     
-    function setUpdateOnConnect($value)
+    protected function hookSchema()
+    {
+        
+    }
+    
+    protected function unhookSchema()
+    {
+        
+    }
+    
+    function setAlwaysRefreshSchema($value)
     {
         if (!empty($value))
         {
-            $this->settings['updateOnConnect'] = boolval($value);
+            $this->settings['alwaysRefreshSchema'] = boolval($value);
         }
     }
 }
@@ -172,9 +179,9 @@ header('Content-Type: text/plain');
 $ctx0 = new EntityContext(array('connection' => array()));
 $ctx1 = new EntityContext('test/schema.json');
 
-// var_dump($ctx0);
-// echo '<br />';
-// var_dump($ctx1);
-// echo '<br />';
+var_dump($ctx0);
+var_dump($ctx1);
+
+// echo json_encode($ctx1->schema, JSON_PRETTY_PRINT);
 
 ?>

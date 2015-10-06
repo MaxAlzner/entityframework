@@ -6,10 +6,195 @@
         "database": "c9",
         "port": 3306
     },
-    "settings": {
-        "updateOnConnect": true
-    },
+    "settings": [
+
+    ],
     "schema": {
-        
+        "tables": {
+            "Address": {
+                "AddressID": {
+                    "type": "int",
+                    "length": 11,
+                    "nullable": false,
+                    "primary": true
+                },
+                "Street": {
+                    "type": "varchar",
+                    "length": 256,
+                    "nullable": false
+                },
+                "Subdivision": {
+                    "type": "varchar",
+                    "length": 32,
+                    "nullable": true
+                },
+                "City": {
+                    "type": "varchar",
+                    "length": 128,
+                    "nullable": false
+                },
+                "StateProvinceCode": {
+                    "type": "varchar",
+                    "length": 2,
+                    "nullable": false
+                },
+                "PostalCode": {
+                    "type": "varchar",
+                    "length": 16,
+                    "nullable": false
+                }
+            },
+            "Country": {
+                "Code": {
+                    "type": "varchar",
+                    "length": 2,
+                    "nullable": false,
+                    "primary": true
+                },
+                "Name": {
+                    "type": "varchar",
+                    "length": 128,
+                    "nullable": false
+                }
+            },
+            "Person": {
+                "PersonID": {
+                    "type": "int",
+                    "length": 11,
+                    "nullable": false,
+                    "primary": true
+                },
+                "ResidenceID": {
+                    "type": "int",
+                    "length": 11,
+                    "nullable": true
+                },
+                "Salutation": {
+                    "type": "varchar",
+                    "length": 4,
+                    "nullable": true
+                },
+                "FirstName": {
+                    "type": "varchar",
+                    "length": 64,
+                    "nullable": false
+                },
+                "MiddleName": {
+                    "type": "varchar",
+                    "length": 64,
+                    "nullable": true
+                },
+                "LastName": {
+                    "type": "varchar",
+                    "length": 64,
+                    "nullable": false
+                },
+                "Cadency": {
+                    "type": "varchar",
+                    "length": 4,
+                    "nullable": true
+                },
+                "EmailAddress": {
+                    "type": "varchar",
+                    "length": 256,
+                    "nullable": false
+                },
+                "PhoneNumber": {
+                    "type": "varchar",
+                    "length": 80,
+                    "nullable": true
+                },
+                "GenderCode": {
+                    "type": "char",
+                    "length": 1,
+                    "nullable": false
+                }
+            },
+            "Residence": {
+                "ResidenceID": {
+                    "type": "int",
+                    "length": 11,
+                    "nullable": false,
+                    "primary": true
+                },
+                "AddressID": {
+                    "type": "int",
+                    "length": 11,
+                    "nullable": false
+                }
+            },
+            "StateProvince": {
+                "Code": {
+                    "type": "varchar",
+                    "length": 2,
+                    "nullable": false,
+                    "primary": true
+                },
+                "CountryCode": {
+                    "type": "varchar",
+                    "length": 2,
+                    "nullable": false
+                },
+                "Name": {
+                    "type": "varchar",
+                    "length": 128,
+                    "nullable": false
+                }
+            }
+        },
+        "links": {
+            "fk_StateProvince": {
+                "from": {
+                    "table": "Address",
+                    "key": "StateProvinceCode",
+                    "property": "StateProvince",
+                    "multiplicity": "1"
+                },
+                "to": {
+                    "table": "StateProvince",
+                    "property": "Addresss",
+                    "multiplicity": "*"
+                }
+            },
+            "fk_Residence": {
+                "from": {
+                    "table": "Person",
+                    "key": "ResidenceID",
+                    "property": "Residence",
+                    "multiplicity": "0..1"
+                },
+                "to": {
+                    "table": "Residence",
+                    "property": "Persons",
+                    "multiplicity": "*"
+                }
+            },
+            "fk_Address": {
+                "from": {
+                    "table": "Residence",
+                    "key": "AddressID",
+                    "property": "Address",
+                    "multiplicity": "1"
+                },
+                "to": {
+                    "table": "Address",
+                    "property": "Residences",
+                    "multiplicity": "*"
+                }
+            },
+            "fk_Country": {
+                "from": {
+                    "table": "StateProvince",
+                    "key": "CountryCode",
+                    "property": "Country",
+                    "multiplicity": "1"
+                },
+                "to": {
+                    "table": "Country",
+                    "property": "StateProvinces",
+                    "multiplicity": "*"
+                }
+            }
+        }
     }
 }
