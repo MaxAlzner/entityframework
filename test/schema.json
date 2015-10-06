@@ -1,0 +1,15 @@
+{
+    "connection": {
+        "host": "localhost",
+        "user": "maxalzner",
+        "password": "",
+        "database": "c9",
+        "port": 3306
+    },
+    "settings": {
+        "updateOnConnect": true
+    },
+    "schema": {
+        
+    }
+}
