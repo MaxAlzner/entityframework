@@ -1,5 +1,79 @@
 <?php
 
+class EntityObject
+{
+    protected $table = null;
+    protected $schema = null;
+    protected $query = array(
+        'select' => [],
+        'where' => []
+        );
+    function __construct($table, array $schema, array $query = null)
+    {
+        if (empty($table))
+        {
+            throw new Exception('Table name is invalid: ' . $table);
+        }
+        
+        if (empty($schema))
+        {
+            throw new Exception('Schema is invalid: ' . $schema);
+        }
+        
+        $this->table = $table;
+        $this->schema = $schema;
+        if (!empty($query))
+        {
+            $this->query['where'] = $query['where'];
+        }
+    }
+    
+    function __toString()
+    {
+        return $this->compile();
+    }
+    
+    function select(string $statement)
+    {
+        
+    }
+    
+    function where($statement)
+    {
+        $ctx = new EntityObject($this->table, $this->schema, $this->query);
+        $ctx->query['where'][] = $statement;
+        return $ctx;
+    }
+    
+    protected function compile()
+    {
+        $sql = 'select ';
+        if (empty($this->query['select']))
+        {
+            $sql .= '* ';
+        }
+        else
+        {
+            foreach ($this->query['select'] as $column)
+            {
+                $sql .= $column . ' ';
+            }
+        }
+        
+        $sql .= 'from ' . $this->table . ' ';
+        if (!empty($this->query['where']))
+        {
+            $sql .= 'where ';
+            foreach ($this->query['where'] as $criteria)
+            {
+                $sql .= $criteria . ' ';
+            }
+        }
+        
+        return $sql;
+    }
+}
+
 class EntityContext
 {
     public $filename = null;
@@ -52,14 +126,26 @@ class EntityContext
             {
                 $this->schema = $file['schema'];
             }
-            
-            $this->hookSchema();
         }
     }
     
     function __destruct()
     {
         $this->disconnect();
+    }
+    
+    function __get($property)
+    {
+        if (!empty($this->schema))
+        {
+            foreach ($this->schema['tables'] as $tableName => $table)
+            {
+                if ($property === $tableName)
+                {
+                    return new EntityObject($tableName, $table);
+                }
+            }
+        }
     }
     
     protected function reconnect()
@@ -156,16 +242,6 @@ class EntityContext
         }
     }
     
-    protected function hookSchema()
-    {
-        
-    }
-    
-    protected function unhookSchema()
-    {
-        
-    }
-    
     function setAlwaysRefreshSchema($value)
     {
         if (!empty($value))
@@ -175,13 +251,24 @@ class EntityContext
     }
 }
 
-header('Content-Type: text/plain');
-$ctx0 = new EntityContext(array('connection' => array()));
-$ctx1 = new EntityContext('test/schema.json');
-
-var_dump($ctx0);
-var_dump($ctx1);
-
-// echo json_encode($ctx1->schema, JSON_PRETTY_PRINT);
+if ($_REQUEST['debug'])
+{
+    header('Content-Type: text/plain');
+    $ctx0 = new EntityContext(array(
+        'connection' => array(
+            'host' => 'localhost',
+            'user' => 'maxalzner',
+            'database' => 'c9'
+            )));
+    $ctx1 = new EntityContext('test/db.json');
+    
+    // var_dump($ctx0);
+    // var_dump($ctx1);
+    var_dump($ctx1->connection);
+    var_dump($q0 = $ctx1->StateProvince);
+    var_dump($q1 = $q0->where('Code = "IL"'));
+    
+    echo $q1;
+}
 
 ?>
