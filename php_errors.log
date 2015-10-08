@@ -1,0 +1,25 @@
+[08-Oct-2015 12:58:33 UTC] PHP Fatal error:  Class 'EntityContext' not found in /home/ubuntu/workspace/test/index.php on line 4
+[08-Oct-2015 12:58:33 UTC] PHP Stack trace:
+[08-Oct-2015 12:58:33 UTC] PHP   1. {main}() /home/ubuntu/workspace/test/index.php:0
+[08-Oct-2015 13:10:16 UTC] PHP Warning:  include(./entityframework.php): failed to open stream: No such file or directory in /home/ubuntu/workspace/test/index.php on line 3
+[08-Oct-2015 13:10:16 UTC] PHP Stack trace:
+[08-Oct-2015 13:10:16 UTC] PHP   1. {main}() /home/ubuntu/workspace/test/index.php:0
+[08-Oct-2015 13:10:16 UTC] PHP Warning:  include(): Failed opening './entityframework.php' for inclusion (include_path='.:/usr/share/php:/usr/share/pear') in /home/ubuntu/workspace/test/index.php on line 3
+[08-Oct-2015 13:10:16 UTC] PHP Stack trace:
+[08-Oct-2015 13:10:16 UTC] PHP   1. {main}() /home/ubuntu/workspace/test/index.php:0
+[08-Oct-2015 13:10:16 UTC] PHP Fatal error:  Class 'EntityContext' not found in /home/ubuntu/workspace/test/index.php on line 6
+[08-Oct-2015 13:10:16 UTC] PHP Stack trace:
+[08-Oct-2015 13:10:16 UTC] PHP   1. {main}() /home/ubuntu/workspace/test/index.php:0
+[08-Oct-2015 13:49:11 UTC] PHP Warning:  file_get_contents(test/db.json): failed to open stream: No such file or directory in /home/ubuntu/workspace/entityframework.php on line 112
+[08-Oct-2015 13:49:11 UTC] PHP Stack trace:
+[08-Oct-2015 13:49:11 UTC] PHP   1. {main}() /home/ubuntu/workspace/test/index.php:0
+[08-Oct-2015 13:49:11 UTC] PHP   2. EntityContext->__construct() /home/ubuntu/workspace/test/index.php:12
+[08-Oct-2015 13:49:11 UTC] PHP   3. file_get_contents() /home/ubuntu/workspace/entityframework.php:112
+[08-Oct-2015 13:49:11 UTC] PHP Fatal error:  Call to a member function where() on a non-object in /home/ubuntu/workspace/test/index.php on line 18
+[08-Oct-2015 13:49:11 UTC] PHP Stack trace:
+[08-Oct-2015 13:49:11 UTC] PHP   1. {main}() /home/ubuntu/workspace/test/index.php:0
+[08-Oct-2015 13:49:27 UTC] PHP Fatal error:  Call to a member function query() on a non-object in /home/ubuntu/workspace/entityframework.php on line 81
+[08-Oct-2015 13:49:27 UTC] PHP Stack trace:
+[08-Oct-2015 13:49:27 UTC] PHP   1. {main}() /home/ubuntu/workspace/test/index.php:0
+[08-Oct-2015 13:49:27 UTC] PHP   2. EntityObject->select() /home/ubuntu/workspace/test/index.php:19
+[08-Oct-2015 13:49:27 UTC] PHP   3. EntityObject->execute() /home/ubuntu/workspace/entityframework.php:39

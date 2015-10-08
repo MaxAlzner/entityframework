@@ -2,28 +2,29 @@
 
 class EntityObject
 {
+    protected $ctx = null;
     protected $table = null;
-    protected $schema = null;
     protected $query = array(
         'select' => [],
         'where' => []
         );
-    function __construct($table, array $schema, array $query = null)
+    function __construct($ctx, $table, array $query = null)
     {
+        if (!($ctx instanceof EntityContext))
+        {
+            throw new Exception('Entity Context is invalid: ' . $ctx);
+        }
+        
         if (empty($table))
         {
             throw new Exception('Table name is invalid: ' . $table);
         }
         
-        if (empty($schema))
-        {
-            throw new Exception('Schema is invalid: ' . $schema);
-        }
-        
+        $this->ctx = $ctx;
         $this->table = $table;
-        $this->schema = $schema;
         if (!empty($query))
         {
+            $this->query['select'] = $query['select'];
             $this->query['where'] = $query['where'];
         }
     }
@@ -33,14 +34,14 @@ class EntityObject
         return $this->compile();
     }
     
-    function select(string $statement)
+    function select(string $statement = null)
     {
-        
+        return $this->execute();
     }
     
     function where($statement)
     {
-        $ctx = new EntityObject($this->table, $this->schema, $this->query);
+        $ctx = new EntityObject($this->ctx, $this->table, $this->query);
         $ctx->query['where'][] = $statement;
         return $ctx;
     }
@@ -71,6 +72,18 @@ class EntityObject
         }
         
         return $sql;
+    }
+    
+    protected function execute()
+    {
+        try
+        {
+            return $this->ctx->sql->query($this->compile());
+        }
+        catch (Exception $e)
+        {
+            throw new Exception('Query is invalid');
+        }
     }
 }
 
@@ -142,7 +155,7 @@ class EntityContext
             {
                 if ($property === $tableName)
                 {
-                    return new EntityObject($tableName, $table);
+                    return new EntityObject($this, $tableName);
                 }
             }
         }
@@ -249,26 +262,6 @@ class EntityContext
             $this->settings['alwaysRefreshSchema'] = boolval($value);
         }
     }
-}
-
-if ($_REQUEST['debug'])
-{
-    header('Content-Type: text/plain');
-    $ctx0 = new EntityContext(array(
-        'connection' => array(
-            'host' => 'localhost',
-            'user' => 'maxalzner',
-            'database' => 'c9'
-            )));
-    $ctx1 = new EntityContext('test/db.json');
-    
-    // var_dump($ctx0);
-    // var_dump($ctx1);
-    var_dump($ctx1->connection);
-    var_dump($q0 = $ctx1->StateProvince);
-    var_dump($q1 = $q0->where('Code = "IL"'));
-    
-    echo $q1;
 }
 
 ?>
