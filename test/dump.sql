@@ -1,6 +1,6 @@
 
 drop table if exists Person;
-drop table if exists Residence;
+drop table if exists Location;
 drop table if exists Address;
 drop table if exists StateProvince;
 drop table if exists Country;
@@ -32,10 +32,14 @@ create table Address
         on delete cascade
 );
 
-create table Residence
+create table Location
 (
-    ResidenceID int not null primary key auto_increment,
+    LocationID int not null primary key auto_increment,
     AddressID int not null,
+    IsCommercial bit not null default 0,
+    IsInsured bit not null default 0,
+    OccpancyLimit int null,
+    Rent decimal(10, 2) null,
     foreign key fk_Address(AddressID) references Address(AddressID)
         on update cascade
         on delete cascade
@@ -44,7 +48,7 @@ create table Residence
 create table Person
 (
     PersonID int not null primary key auto_increment,
-    ResidenceID int null,
+    LocationID int null,
     Salutation varchar(4) null,
     FirstName varchar(64) not null,
     MiddleName varchar(64) null,
@@ -53,10 +57,34 @@ create table Person
     EmailAddress varchar(256) not null,
     PhoneNumber varchar(80) null,
     GenderCode char not null,
-    foreign key fk_Residence(ResidenceID) references Residence(ResidenceID)
+    foreign key fk_Location(LocationID) references Location(LocationID)
         on update cascade
         on delete cascade
 );
+
+drop view if exists Residence;
+
+create view Residence
+as
+    select
+        Location.LocationID,
+        Address.AddressID as AddressID,
+        Street,
+        Subdivision,
+        City,
+        StateProvinceCode,
+        PostalCode,
+        IsInsured,
+        OccpancyLimit,
+        -- sum(select PersonID from Person where Person.LocationID = Location.LocationID) as Occupants,
+        Rent
+    from Location
+    left join Address
+        on Location.AddressID = Address.AddressID
+    left join Person
+        on Person.LocationID is not null and Location.LocationID = Person.LocationID
+    where
+        IsCommercial = 0;
 
 insert into Country (Code, Name)
 values
@@ -131,3 +159,24 @@ values
     ('QC', 'CA', 'Quebec'),
     ('SK', 'CA', 'Saskatchewan'),
     ('YT', 'CA', 'Yukon Territory');
+
+insert into Address
+    (Street, Subdivision, City, StateProvinceCode, PostalCode)
+values
+    ('1234 Nowhere street', null, 'Somewhere', 'AK', '987654'),
+    ('2564 NW Icy street', null, 'Glacier', 'AK', '987654'),
+    ('5132 E Blank street', null, 'Rock', 'AK', '987654'),
+    ('9804 Middle ctr', null, 'Mound', 'AK', '987654');
+
+insert into Location
+    (AddressID, IsCommercial, IsInsured, OccpancyLimit, Rent)
+values
+    (1, 0, 1, 4, null),
+    (2, 0, 0, null, null),
+    (4, 1, 1, null, 8000.00);
+
+insert into Person
+    (LocationID, Salutation, FirstName, MiddleName, LastName, Cadency, EmailAddress, PhoneNumber, GenderCode)
+values
+    (1, null, 'John', null, 'Doe', 'Sr', 'john.doe@web.mail', '3091236589', 'M'),
+    (1, null, 'Jane', null, 'Doe', null, 'jane.doe@web.mail', '3091236589', 'F');

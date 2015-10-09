@@ -6,15 +6,15 @@
         "database": "c9",
         "port": 3306
     },
-    "settings": [
-
-    ],
+    "settings": {
+        "alwaysRefreshSchema": true
+    },
     "schema": {
         "tables": {
             "Address": {
                 "AddressID": {
                     "type": "int",
-                    "length": 11,
+                    "length": 10,
                     "nullable": false,
                     "primary": true
                 },
@@ -42,6 +42,15 @@
                     "type": "varchar",
                     "length": 16,
                     "nullable": false
+                },
+                "Code": {
+                    "primary": true
+                },
+                "LocationID": {
+                    "primary": true
+                },
+                "PersonID": {
+                    "primary": true
                 }
             },
             "Country": {
@@ -55,19 +64,69 @@
                     "type": "varchar",
                     "length": 128,
                     "nullable": false
+                },
+                "AddressID": {
+                    "primary": true
+                },
+                "LocationID": {
+                    "primary": true
+                },
+                "PersonID": {
+                    "primary": true
+                }
+            },
+            "Location": {
+                "LocationID": {
+                    "type": "int",
+                    "length": 10,
+                    "nullable": false,
+                    "primary": true
+                },
+                "AddressID": {
+                    "type": "int",
+                    "length": 10,
+                    "nullable": false,
+                    "primary": true
+                },
+                "IsCommercial": {
+                    "type": "bit",
+                    "length": 1,
+                    "nullable": false
+                },
+                "IsInsured": {
+                    "type": "bit",
+                    "length": 1,
+                    "nullable": false
+                },
+                "OccpancyLimit": {
+                    "type": "int",
+                    "length": 10,
+                    "nullable": true
+                },
+                "Rent": {
+                    "type": "decimal",
+                    "length": 10,
+                    "nullable": true
+                },
+                "Code": {
+                    "primary": true
+                },
+                "PersonID": {
+                    "primary": true
                 }
             },
             "Person": {
                 "PersonID": {
                     "type": "int",
-                    "length": 11,
+                    "length": 10,
                     "nullable": false,
                     "primary": true
                 },
-                "ResidenceID": {
+                "LocationID": {
                     "type": "int",
-                    "length": 11,
-                    "nullable": true
+                    "length": 10,
+                    "nullable": true,
+                    "primary": true
                 },
                 "Salutation": {
                     "type": "varchar",
@@ -108,19 +167,72 @@
                     "type": "char",
                     "length": 1,
                     "nullable": false
+                },
+                "AddressID": {
+                    "primary": true
+                },
+                "Code": {
+                    "primary": true
                 }
             },
             "Residence": {
-                "ResidenceID": {
+                "LocationID": {
                     "type": "int",
-                    "length": 11,
+                    "length": 10,
                     "nullable": false,
                     "primary": true
                 },
                 "AddressID": {
                     "type": "int",
-                    "length": 11,
+                    "length": 10,
+                    "nullable": true,
+                    "primary": true
+                },
+                "Street": {
+                    "type": "varchar",
+                    "length": 256,
+                    "nullable": true
+                },
+                "Subdivision": {
+                    "type": "varchar",
+                    "length": 32,
+                    "nullable": true
+                },
+                "City": {
+                    "type": "varchar",
+                    "length": 128,
+                    "nullable": true
+                },
+                "StateProvinceCode": {
+                    "type": "varchar",
+                    "length": 2,
+                    "nullable": true
+                },
+                "PostalCode": {
+                    "type": "varchar",
+                    "length": 16,
+                    "nullable": true
+                },
+                "IsInsured": {
+                    "type": "bit",
+                    "length": 1,
                     "nullable": false
+                },
+                "OccpancyLimit": {
+                    "type": "int",
+                    "length": 10,
+                    "nullable": true
+                },
+                "Rent": {
+                    "type": "decimal",
+                    "length": 10,
+                    "nullable": true
+                },
+                "Code": {
+                    "primary": true
+                },
+                "PersonID": {
+                    "primary": true
                 }
             },
             "StateProvince": {
@@ -139,11 +251,20 @@
                     "type": "varchar",
                     "length": 128,
                     "nullable": false
+                },
+                "AddressID": {
+                    "primary": true
+                },
+                "LocationID": {
+                    "primary": true
+                },
+                "PersonID": {
+                    "primary": true
                 }
             }
         },
         "links": {
-            "fk_StateProvince": {
+            "Address_ibfk_1": {
                 "from": {
                     "table": "Address",
                     "key": "StateProvinceCode",
@@ -152,37 +273,40 @@
                 },
                 "to": {
                     "table": "StateProvince",
-                    "property": "Addresss",
+                    "key": "Code",
+                    "property": "Addresses",
                     "multiplicity": "*"
                 }
             },
-            "fk_Residence": {
+            "Location_ibfk_1": {
                 "from": {
-                    "table": "Person",
-                    "key": "ResidenceID",
-                    "property": "Residence",
-                    "multiplicity": "0..1"
-                },
-                "to": {
-                    "table": "Residence",
-                    "property": "Persons",
-                    "multiplicity": "*"
-                }
-            },
-            "fk_Address": {
-                "from": {
-                    "table": "Residence",
+                    "table": "Location",
                     "key": "AddressID",
                     "property": "Address",
                     "multiplicity": "1"
                 },
                 "to": {
                     "table": "Address",
-                    "property": "Residences",
+                    "key": "AddressID",
+                    "property": "Locations",
                     "multiplicity": "*"
                 }
             },
-            "fk_Country": {
+            "Person_ibfk_1": {
+                "from": {
+                    "table": "Person",
+                    "key": "LocationID",
+                    "property": "Location",
+                    "multiplicity": "0..1"
+                },
+                "to": {
+                    "table": "Location",
+                    "key": "LocationID",
+                    "property": "Persons",
+                    "multiplicity": "*"
+                }
+            },
+            "StateProvince_ibfk_1": {
                 "from": {
                     "table": "StateProvince",
                     "key": "CountryCode",
@@ -191,6 +315,7 @@
                 },
                 "to": {
                     "table": "Country",
+                    "key": "Code",
                     "property": "StateProvinces",
                     "multiplicity": "*"
                 }
