@@ -168,6 +168,34 @@ class EntityObject
         {
             // echo $this->compile() . PHP_EOL;
             $result = $this->ctx->sql->query($this->compile())->fetch_all(MYSQLI_ASSOC);
+            foreach ($result as &$row)
+            {
+                foreach ($row as $columnName => &$column)
+                {
+                    $schema = $this->ctx->schema['tables'][$this->table][$columnName];
+                    switch ($schema['type'])
+                    {
+                        case 'int':
+                        case 'tinyint':
+                        case 'smallint':
+                        case 'mediumint':
+                        case 'bigint':
+                            $column = $column !== null ? intval($column) : $column;
+                            break;
+                        case 'float':
+                        case 'double':
+                        case 'decimal':
+                            $column = $column !== null ? doubleval($column) : $column;
+                            break;
+                        case 'bit':
+                            $column = $column !== null ? ($column === '1' ? true : false) : $column;
+                            break;
+                        default:
+                            break;
+                    }
+                }
+            }
+            
             $links = $this->ctx->get_links($this->table);
             if (!empty($links) && !empty($this->query['include']))
             {
