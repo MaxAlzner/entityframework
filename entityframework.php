@@ -42,7 +42,13 @@ class EntityObject
             $statement = explode(',', $statement);
             foreach ($statement as $column)
             {
-                $obj->query['select'][] = trim($column);
+                $column = trim($column);
+                if (!array_key_exists($column, $obj->ctx->schema['tables'][$obj->query['from']]))
+                {
+                    throw new Exception('Column name is invalid: "' . $column . '"');
+                }
+                
+                $obj->query['select'][] = $column;
             }
         }
         
@@ -75,7 +81,13 @@ class EntityObject
             $statement = explode(',', $statement);
             foreach ($statement as $column)
             {
-                $obj->query['orderby'][] = trim($column);
+                $column = trim($column);
+                if (!array_key_exists($column, $obj->ctx->schema['tables'][$obj->query['from']]))
+                {
+                    throw new Exception('Column name is invalid: "' . $column . '"');
+                }
+                
+                $obj->query['orderby'][] = $column;
             }
         }
         
@@ -86,9 +98,9 @@ class EntityObject
     function limit($num)
     {
         $obj = new EntityObject($this->ctx, $this->query);
-        if (is_int($num))
+        if (is_int($num) || is_string($num))
         {
-            $obj->query['limit'] = $num;
+            $obj->query['limit'] = intval($num);
         }
         
         return $obj;
@@ -116,6 +128,10 @@ class EntityObject
             else if (is_array($statement))
             {
                 $current = empty($current) ? $statement : array_merge_recursive($current, $statement);
+            }
+            else
+            {
+                throw new Exception('Injection path is invalid: ' . $statement);
             }
         }
         
@@ -149,7 +165,9 @@ class EntityObject
     {
         try
         {
-            $result = $this->ctx->sql->query($this->compile($this->query))->fetch_all(MYSQLI_ASSOC);
+            $query = $this->compile();
+            // echo $query . PHP_EOL;
+            $result = $this->ctx->sql->query($query)->fetch_all(MYSQLI_ASSOC);
             foreach ($result as &$row)
             {
                 foreach ($row as $columnName => &$column)
@@ -216,7 +234,7 @@ class EntityObject
         }
         catch (Exception $e)
         {
-            throw new Exception('Query is invalid');
+            throw new Exception('Query is invalid', 0, $e);
         }
     }
 }
