@@ -3,9 +3,9 @@
 class EntityObject
 {
     protected $ctx = null;
-    protected $table = null;
     protected $query = array(
         'select' => [],
+        'from' => null,
         'where' => [],
         'orderby' => [],
         'orderdir' => null,
@@ -13,30 +13,20 @@ class EntityObject
         'single' => false,
         'include' => []
         );
-    function __construct($ctx, $table, array $query = null)
+    function __construct($ctx, array $query)
     {
         if (!($ctx instanceof EntityContext))
         {
             throw new Exception('EntityContext is invalid: ' . $ctx);
         }
         
-        if (empty($table))
+        if (empty($query['from']))
         {
-            throw new Exception('Table name is invalid: ' . $table);
+            throw new Exception('Table name must be defined: ' . $query);
         }
         
         $this->ctx = $ctx;
-        $this->table = $table;
-        if (!empty($query))
-        {
-            $this->query['select'] = $query['select'];
-            $this->query['where'] = $query['where'];
-            $this->query['orderby'] = $query['orderby'];
-            $this->query['orderdir'] = $query['orderdir'];
-            $this->query['limit'] = $query['limit'];
-            $this->query['single'] = $query['single'];
-            $this->query['include'] = $query['include'];
-        }
+        $this->query = $query;
     }
     
     function __toString()
@@ -46,112 +36,105 @@ class EntityObject
     
     function select($statement = null)
     {
-        $ctx = new EntityObject($this->ctx, $this->table, $this->query);
+        $obj = new EntityObject($this->ctx, $this->query);
         if (!empty($statement) && is_string($statement))
         {
             $statement = explode(',', $statement);
             foreach ($statement as $column)
             {
-                $ctx->query['select'][] = trim($column);
+                $obj->query['select'][] = trim($column);
             }
         }
         
-        return $ctx->execute();
+        return $obj->execute();
     }
     
     function single($statement = null)
     {
-        $ctx = $this->limit(1);
-        $ctx->query['single'] = true;
-        return $ctx->select($statement);
+        $obj = $this->limit(1);
+        $obj->query['single'] = true;
+        return $obj->select($statement);
     }
     
     function where($statement)
     {
-        $ctx = new EntityObject($this->ctx, $this->table, $this->query);
+        $obj = new EntityObject($this->ctx, $this->query);
         if (!empty($statement) && is_string($statement))
         {
-            $ctx->query['where'][] = $statement;
+            $obj->query['where'][] = $statement;
         }
         
-        return $ctx;
+        return $obj;
     }
     
     function orderby($statement, $direction = null)
     {
-        $ctx = new EntityObject($this->ctx, $this->table, $this->query);
+        $obj = new EntityObject($this->ctx, $this->query);
         if (!empty($statement) && is_string($statement))
         {
             $statement = explode(',', $statement);
             foreach ($statement as $column)
             {
-                $ctx->query['orderby'][] = trim($column);
+                $obj->query['orderby'][] = trim($column);
             }
         }
         
-        $ctx->query['orderdir'] = empty($direction) || ($direction != 'desc' && $direction != 'asc') ? 'asc' : $direction;
-        return $ctx;
+        $obj->query['orderdir'] = empty($direction) || ($direction != 'desc' && $direction != 'asc') ? 'asc' : $direction;
+        return $obj;
     }
     
     function limit($num)
     {
-        $ctx = new EntityObject($this->ctx, $this->table, $this->query);
+        $obj = new EntityObject($this->ctx, $this->query);
         if (is_int($num))
         {
-            $ctx->query['limit'] = $num;
+            $obj->query['limit'] = $num;
         }
         
-        return $ctx;
+        return $obj;
     }
     
     function inject($statement)
     {
-        $ctx = new EntityObject($this->ctx, $this->table, $this->query);
-        if (!empty($statement) && is_string($statement))
+        $obj = new EntityObject($this->ctx, $this->query);
+        $current = &$obj->query['include'];
+        if (!empty($statement))
         {
-            $ctx->query['include'][] = $statement;
+            if (is_string($statement))
+            {
+                $path = explode('.', $statement);
+                foreach ($path as $navigation)
+                {
+                    if (empty($current[$navigation]))
+                    {
+                        $current[$navigation] = [];
+                    }
+                    
+                    $current = &$current[$navigation];
+                }
+            }
+            else if (is_array($statement))
+            {
+                $current = empty($current) ? $statement : array_merge_recursive($current, $statement);
+            }
         }
         
-        return $ctx;
+        return $obj;
     }
     
     protected function compile()
     {
         $sql = 'select ';
-        $statements = $this->query['select'];
-        if (empty($statements))
+        $sql .= empty($this->query['select']) ? '* ' : (implode(', ', $this->query['select']) . ' ');
+        $sql .= 'from ' . $this->query['from'] . ' ';
+        if (!empty($this->query['where']))
         {
-            $sql .= '* ';
-        }
-        else
-        {
-            foreach ($statements as $index => $column)
-            {
-                $sql .= $column . ($index + 1 < count($statements) ? ', ' : ' ');
-            }
+            $sql .= 'where (' . implode(') and (', $this->query['where']) . ') ';
         }
         
-        $sql .= 'from ' . $this->table . ' ';
-        $statements = $this->query['where'];
-        if (!empty($statements))
+        if (!empty($this->query['orderby']) && !empty($this->query['orderdir']))
         {
-            $sql .= 'where ';
-            foreach ($statements as $index => $criteria)
-            {
-                $sql .= '(' . $criteria . ($index + 1 < count($statements) ? ') and ' : ') ');
-            }
-        }
-        
-        $statements = $this->query['orderby'];
-        if (!empty($statements) && !empty($this->query['orderdir']))
-        {
-            $sql .= 'order by ';
-            foreach ($statements as $index => $column)
-            {
-                $sql .= $column . ($index + 1 < count($statements) ? ', ' : ' ');
-            }
-            
-            $sql .= $this->query['orderdir'] . ' ';
+            $sql .= 'order by ' . implode(', ', $this->query['orderby']) . ' ' . $this->query['orderdir'] . ' ';
         }
         
         if (!empty($this->query['limit']))
@@ -166,13 +149,12 @@ class EntityObject
     {
         try
         {
-            // echo $this->compile() . PHP_EOL;
-            $result = $this->ctx->sql->query($this->compile())->fetch_all(MYSQLI_ASSOC);
+            $result = $this->ctx->sql->query($this->compile($this->query))->fetch_all(MYSQLI_ASSOC);
             foreach ($result as &$row)
             {
                 foreach ($row as $columnName => &$column)
                 {
-                    $schema = $this->ctx->schema['tables'][$this->table][$columnName];
+                    $schema = $this->ctx->schema['tables'][$this->query['from']][$columnName];
                     switch ($schema['type'])
                     {
                         case 'int':
@@ -196,22 +178,22 @@ class EntityObject
                 }
             }
             
-            $links = $this->ctx->get_links($this->table);
+            $links = $this->ctx->get_links($this->query['from']);
             if (!empty($links) && !empty($this->query['include']))
             {
                 foreach ($result as &$row)
                 {
                     foreach ($links as $link)
                     {
-                        foreach ($this->query['include'] as $navigation)
+                        foreach ($this->query['include'] as $navigation => $chain)
                         {
-                            // $navigation = explode('.', $navigation);
                             if ($link['to']['property'] === $navigation)
                             {
                                 $key = $row[$link['to']['key']];
                                 $key = is_string($key) ? ('"' . $key . '"') : $key;
                                 $row[$link['to']['property']] = $this->ctx
                                     ->__get($link['from']['table'])
+                                    ->inject($chain)
                                     ->where($link['from']['key'] . ' = ' . $key)
                                     ->select();
                             }
@@ -221,6 +203,7 @@ class EntityObject
                                 $key = is_string($key) ? ('"' . $key . '"') : $key;
                                 $row[$link['from']['property']] = $this->ctx
                                     ->__get($link['to']['table'])
+                                    ->inject($chain)
                                     ->where($link['to']['key'] . ' = ' . $key)
                                     ->single();
                             }
@@ -309,7 +292,7 @@ class EntityContext
             {
                 if ($property === $tableName)
                 {
-                    return new EntityObject($this, $tableName);
+                    return new EntityObject($this, array('from' => $tableName));
                 }
             }
         }
