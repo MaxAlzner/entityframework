@@ -135,6 +135,7 @@ class EntityObject
             }
         }
         
+        unset($current);
         return $obj;
     }
     
@@ -193,6 +194,8 @@ class EntityObject
                         default:
                             break;
                     }
+                    
+                    unset($column);
                 }
             }
             
@@ -227,6 +230,8 @@ class EntityObject
                             }
                         }
                     }
+                    
+                    unset($row);
                 }
             }
             
@@ -396,40 +401,35 @@ class EntityContext
             $this->schema['tables'][$tableName] = $table;
         }
         
-        foreach ($this->schema['tables'] as $tableName => &$table)
+        $keys = $this->sql->query('select * from information_schema.key_column_usage where table_schema = "' . $this->connection['database'] . '"');
+        foreach ($keys as $key)
         {
-            $keys = $this->sql->query('select * from information_schema.key_column_usage where table_schema = "' . $this->connection['database'] . '"');
-            foreach ($keys as $key)
+            if ($key['CONSTRAINT_NAME'] === 'PRIMARY')
             {
-                if ($key['CONSTRAINT_NAME'] === 'PRIMARY')
-                {
-                    $table[$key['COLUMN_NAME']]['primary'] = true;
-                }
-                else if (substr($key['CONSTRAINT_NAME'], -7) === '_ibfk_1')
-                {
-                    $principal = $key['TABLE_NAME'];
-                    $dependent = $key['REFERENCED_TABLE_NAME'];
-                    $property = substr($principal, -1) === 's' ? ($principal . 'es') :
-                        (substr($principal, -1) === 'y' ? (substr($principal, 0, count($principal) - 1) . 'ies') :
-                        ($principal . 's'));
-                    $this->schema['links'][$key['CONSTRAINT_NAME']] = array(
-                        'from' => array(
-                            'table' => $principal,
-                            'key' => $key['COLUMN_NAME'],
-                            'property' => $dependent,
-                            'multiplicity' => $this->schema['tables'][$principal][$key['COLUMN_NAME']]['nullable'] ? '0..1' : '1'
-                            ),
-                        'to' => array(
-                            'table' => $dependent,
-                            'key' => $key['REFERENCED_COLUMN_NAME'],
-                            'property' => $property,
-                            'multiplicity' => '*'
-                            )
-                        );
-                }
+                $this->schema['tables'][$key['TABLE_NAME']][$key['COLUMN_NAME']]['primary'] = true;
             }
-            
-            unset($table);
+            else if (strtolower(substr($key['CONSTRAINT_NAME'], -7)) === '_ibfk_1' || strtolower(substr($key['CONSTRAINT_NAME'], 0, 3)) === 'fk_')
+            {
+                $principal = $key['TABLE_NAME'];
+                $dependent = $key['REFERENCED_TABLE_NAME'];
+                $property = substr($principal, -1) === 's' ? ($principal . 'es') :
+                    (substr($principal, -1) === 'y' ? (substr($principal, 0, count($principal) - 1) . 'ies') :
+                    ($principal . 's'));
+                $this->schema['links'][$key['CONSTRAINT_NAME']] = array(
+                    'from' => array(
+                        'table' => $principal,
+                        'key' => $key['COLUMN_NAME'],
+                        'property' => $dependent,
+                        'multiplicity' => $this->schema['tables'][$principal][$key['COLUMN_NAME']]['nullable'] ? '0..1' : '1'
+                        ),
+                    'to' => array(
+                        'table' => $dependent,
+                        'key' => $key['REFERENCED_COLUMN_NAME'],
+                        'property' => $property,
+                        'multiplicity' => '*'
+                        )
+                    );
+            }
         }
         
         if (!empty($this->filename))
