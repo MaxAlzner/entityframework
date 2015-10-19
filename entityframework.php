@@ -1,8 +1,117 @@
 <?php
 
+class EntityConnection
+{
+    public $host = 'localhost';
+    public $user = '';
+    public $password = '';
+    public $database = 'mysql';
+    public $port = 3306;
+    public $sql = null;
+    
+    function __construct(array $connection = null)
+    {
+        if (!empty($connection))
+        {
+            $this->host = !empty($connection['host']) ? strval($connection['host']) : $this->host;
+            $this->user = !empty($connection['user']) ? strval($connection['user']) : $this->user;
+            $this->password = !empty($connection['password']) ? strval($connection['password']) : $this->password;
+            $this->database = !empty($connection['database']) ? strval($connection['database']) : $this->database;
+            $this->port = !empty($connection['port']) ? intval($connection['port']) : $this->port;
+        }
+        
+        $this->reconnect();
+    }
+    
+    function __destruct()
+    {
+        $this->disconnect();
+    }
+    
+    public function reconnect()
+    {
+        $this->disconnect();
+        if (!empty($this->host) && !empty($this->user))
+        {
+            $this->sql = new mysqli(
+                $this->host,
+                $this->user,
+                $this->password,
+                $this->database,
+                $this->port);
+        }
+    }
+    
+    public function disconnect()
+    {
+        if (!empty($this->sql))
+        {
+            $this->sql->close();
+            $this->sql = null;
+        }
+    }
+    
+    public function query($statement, array $schema = null)
+    {
+        if (!empty($this->sql) && !empty($statement) && is_string($statement))
+        {
+            $result = $this->sql->query($statement);
+            $this->sql->next_result();
+            if ($result instanceof mysqli_result)
+            {
+                $result = $result->fetch_all(MYSQLI_ASSOC);
+                if (!empty($schema))
+                {
+                    foreach ($result as &$row)
+                    {
+                        foreach ($row as $columnName => &$column)
+                        {
+                            $columnSchema = $schema[$columnName];
+                            $column = self::map_value($column, $columnSchema['type'], $columnSchema['length']);
+                            unset($column);
+                        }
+                        
+                        unset($row);
+                    }
+                }
+            }
+            
+            return $result;
+        }
+        
+        return false;
+    }
+    
+    protected static function map_value($value, $type, $length)
+    {
+        switch ($type)
+        {
+            case 'int':
+            case 'tinyint':
+            case 'smallint':
+            case 'mediumint':
+            case 'bigint':
+                return intval($value);
+                break;
+            case 'float':
+            case 'double':
+            case 'decimal':
+                return doubleval($value);
+                break;
+            case 'bit':
+                return $value === '1' ? true : false;
+                break;
+            default:
+                return substr(strval($value), 0, $length);
+                break;
+        }
+    }
+}
+
 class EntityObject
 {
     protected $ctx = null;
+    protected $connection = null;
     protected $query = array(
         'select' => [],
         'from' => null,
@@ -13,11 +122,16 @@ class EntityObject
         'single' => false,
         'include' => []
         );
-    function __construct($ctx, array $query)
+    function __construct($ctx, $connection, array $query)
     {
         if (!($ctx instanceof EntityContext))
         {
             throw new Exception('EntityContext is invalid: ' . $ctx);
+        }
+        
+        if (!($connection instanceof EntityConnection))
+        {
+            throw new Exception('EntityConnection is invalid: ' . $connection);
         }
         
         if (empty($query['from']))
@@ -26,6 +140,7 @@ class EntityObject
         }
         
         $this->ctx = $ctx;
+        $this->connection = $connection;
         $this->query = $query;
     }
     
@@ -36,7 +151,7 @@ class EntityObject
     
     function select($statement = null)
     {
-        $obj = new EntityObject($this->ctx, $this->query);
+        $obj = new EntityObject($this->ctx, $this->connection, $this->query);
         if (!empty($statement) && is_string($statement))
         {
             $obj->query['select'] = [];
@@ -66,7 +181,7 @@ class EntityObject
     
     function where($statement)
     {
-        $obj = new EntityObject($this->ctx, $this->query);
+        $obj = new EntityObject($this->ctx, $this->connection, $this->query);
         if (!empty($statement) && is_string($statement))
         {
             $obj->query['where'][] = $statement;
@@ -77,7 +192,7 @@ class EntityObject
     
     function orderby($statement, $direction = null)
     {
-        $obj = new EntityObject($this->ctx, $this->query);
+        $obj = new EntityObject($this->ctx, $this->connection, $this->query);
         if (!empty($statement) && is_string($statement))
         {
             $statement = explode(',', $statement);
@@ -100,7 +215,7 @@ class EntityObject
     
     function limit($num)
     {
-        $obj = new EntityObject($this->ctx, $this->query);
+        $obj = new EntityObject($this->ctx, $this->connection, $this->query);
         if (is_int($num) || is_string($num))
         {
             $obj->query['limit'] = intval($num);
@@ -111,7 +226,7 @@ class EntityObject
     
     function inject($statement)
     {
-        $obj = new EntityObject($this->ctx, $this->query);
+        $obj = new EntityObject($this->ctx, $this->connection, $this->query);
         $current = &$obj->query['include'];
         if (!empty($statement))
         {
@@ -170,37 +285,7 @@ class EntityObject
         try
         {
             $query = $this->compile();
-            $result = $this->ctx->sql->query($query)->fetch_all(MYSQLI_ASSOC);
-            $schema = $this->ctx->get_table($this->query['from']);
-            foreach ($result as &$row)
-            {
-                foreach ($row as $columnName => &$column)
-                {
-                    switch ($schema[$columnName]['type'])
-                    {
-                        case 'int':
-                        case 'tinyint':
-                        case 'smallint':
-                        case 'mediumint':
-                        case 'bigint':
-                            $column = $column !== null ? intval($column) : $column;
-                            break;
-                        case 'float':
-                        case 'double':
-                        case 'decimal':
-                            $column = $column !== null ? doubleval($column) : $column;
-                            break;
-                        case 'bit':
-                            $column = $column !== null ? ($column === '1' ? true : false) : $column;
-                            break;
-                        default:
-                            break;
-                    }
-                    
-                    unset($column);
-                }
-            }
-            
+            $result = $this->connection->query($query, $this->ctx->get_table($this->query['from']));
             $relationships = $this->ctx->get_table_relationships($this->query['from']);
             if (!empty($relationships) && !empty($this->query['include']))
             {
@@ -257,18 +342,11 @@ class EntityObject
 class EntityContext
 {
     public $filename = null;
-    public $connection = array(
-        'host' => 'localhost',
-        'user' => '',
-        'password' => '',
-        'database' => 'mysql',
-        'port' => 3306
-        );
+    public $connection = null;
     public $settings = array(
         'alwaysRefreshSchema' => false
         );
     public $schema = null;
-    public $sql = null;
     function __construct($file = null)
     {
         if ($file)
@@ -283,15 +361,6 @@ class EntityContext
                 $file = get_object_vars($file);
             }
             
-            if (!empty($file['connection']))
-            {
-                $this->connection['host'] = !empty($file['connection']['host']) ? strval($file['connection']['host']) : $this->connection['host'];
-                $this->connection['user'] = !empty($file['connection']['user']) ? strval($file['connection']['user']) : $this->connection['user'];
-                $this->connection['password'] = !empty($file['connection']['password']) ? strval($file['connection']['password']) : $this->connection['password'];
-                $this->connection['database'] = !empty($file['connection']['database']) ? strval($file['connection']['database']) : $this->connection['database'];
-                $this->connection['port'] = !empty($file['connection']['port']) ? intval($file['connection']['port']) : $this->connection['port'];
-            }
-            
             if (!empty($file['settings']))
             {
                 foreach ($file['settings'] as $setting => $value)
@@ -300,7 +369,7 @@ class EntityContext
                 }
             }
             
-            $this->reconnect();
+            $this->connection = new EntityConnection(!empty($file['connection']) ? $file['connection'] : null);
             if (empty($file['schema']) || $this->settings['alwaysRefreshSchema'])
             {
                 $this->refresh_schema();
@@ -312,17 +381,12 @@ class EntityContext
         }
     }
     
-    function __destruct()
-    {
-        $this->disconnect();
-    }
-    
     function __get($property)
     {
         $table = $this->get_table($property);
         if ($table !== false)
         {
-            return new EntityObject($this, array('from' => $property));
+            return new EntityObject($this, $this->connection, array('from' => $property));
         }
         
         throw new Exception('Property is invalid or schema could not be found.');
@@ -457,14 +521,7 @@ class EntityContext
         
         $sql = 'call ' . $method . ' (' . implode(', ', $args) . ')';
         echo $sql . PHP_EOL;
-        $result = $this->sql->query($sql);
-        if ($result instanceof mysqli_result)
-        {
-            $result = $result->fetch_all(MYSQLI_ASSOC);
-        }
-        
-        $this->sql->next_result();
-        return $result;
+        return $this->connection->query($sql);
     }
     
     public function call_function($method, $args)
@@ -486,40 +543,12 @@ class EntityContext
         
         $sql = 'select ' . $method . ' (' . implode(', ', $args) . ')';
         echo $sql . PHP_EOL;
-        $result = $this->sql->query($sql)->fetch_all(MYSQLI_NUM)[0][0];
-        return self::map_value($result, $schema['type'], $schema['length']);
-    }
-    
-    protected function reconnect()
-    {
-        $this->disconnect();
-        if ($this->connection['host'] && $this->connection['user'])
-        {
-            $this->sql = new mysqli(
-                $this->connection['host'],
-                $this->connection['user'],
-                $this->connection['password'],
-                $this->connection['database'],
-                $this->connection['port']);
-        }
-    }
-    
-    protected function disconnect()
-    {
-        if (!empty($this->sql))
-        {
-            $this->sql->close();
-            $this->sql = null;
-        }
+        $result = $this->connection->query($sql);
+        return current($result[0]);
     }
     
     protected function refresh_schema()
     {
-        if (empty($this->sql))
-        {
-            return;
-        }
-        
         $this->schema = array(
             'tables' => [],
             'views' => [],
@@ -527,21 +556,28 @@ class EntityContext
             'functions' => [],
             'relationships' => []
             );
-        $views = $this->sql
-            ->query('select table_name from information_schema.views where table_schema = "' . $this->connection['database'] . '"')->fetch_all(MYSQLI_NUM);
+        $views = $this->connection
+            ->query('select table_name
+            from information_schema.views
+            where table_schema = "' . $this->connection->database . '"');
         foreach ($views as &$name)
         {
-            $name = $name[0];
+            $name = $name['table_name'];
+            unset($name);
         }
         
-        $tables = $this->sql
-            ->query('select table_name from information_schema.tables where table_schema = "' . $this->connection['database'] . '"')->fetch_all(MYSQLI_NUM);
+        $tables = $this->connection
+            ->query('select table_name
+            from information_schema.tables
+            where table_schema = "' . $this->connection->database . '"');
         foreach ($tables as $table)
         {
-            $tableName = $table[0];
+            $tableName = $table['table_name'];
             $table = array();
-            $columns = $this->sql
-                ->query('select * from information_schema.columns where table_name = "' . $tableName . '"');
+            $columns = $this->connection
+                ->query('select *
+                from information_schema.columns
+                where table_name = "' . $tableName . '"');
             foreach ($columns as $column)
             {
                 $table[$column['COLUMN_NAME']] = array(
@@ -556,8 +592,10 @@ class EntityContext
             $this->schema[array_search($tableName, $views) === false ? 'tables' : 'views'][$tableName] = $table;
         }
         
-        $routines = $this->sql
-            ->query('select * from information_schema.routines where routine_schema = "' . $this->connection['database'] . '"');
+        $routines = $this->connection
+            ->query('select *
+            from information_schema.routines
+            where routine_schema = "' . $this->connection->database . '"');
         foreach ($routines as $routine)
         {
             $routineName = $routine['ROUTINE_NAME'];
@@ -580,8 +618,10 @@ class EntityContext
                 $routine = &$this->schema['functions'][$routineName];
             }
             
-            $parameters = $this->sql
-                ->query('select * from information_schema.parameters where specific_name = "' . $routineName . '"');
+            $parameters = $this->connection
+                ->query('select *
+                from information_schema.parameters
+                where specific_name = "' . $routineName . '"');
             foreach ($parameters as $parameter)
             {
                 if (!empty($parameter['PARAMETER_MODE']) && !empty($parameter['PARAMETER_NAME']))
@@ -600,7 +640,7 @@ class EntityContext
             unset($routine);
         }
         
-        $keys = $this->sql
+        $keys = $this->connection
             ->query('select
             c.constraint_catalog,
             c.constraint_schema,
@@ -618,7 +658,7 @@ class EntityContext
             from information_schema.table_constraints as c
             inner join information_schema.key_column_usage as k
                 on k.constraint_name = c.constraint_name and k.table_name = c.table_name
-            where c.table_schema = "' . $this->connection['database'] . '"');
+            where c.table_schema = "' . $this->connection->database . '"');
         foreach ($keys as $key)
         {
             if ($key['constraint_type'] === 'PRIMARY KEY')
@@ -666,36 +706,18 @@ class EntityContext
         }
     }
     
-    protected static function map_value($value, $type, $length)
-    {
-        switch ($type)
-        {
-            case 'int':
-            case 'tinyint':
-            case 'smallint':
-            case 'mediumint':
-            case 'bigint':
-                return intval($value);
-                break;
-            case 'float':
-            case 'double':
-            case 'decimal':
-                return doubleval($value);
-                break;
-            case 'bit':
-                return $value === '1' ? true : false;
-                break;
-            default:
-                return substr(strval($value), 0, $length);
-                break;
-        }
-    }
-    
     protected static function strpluralize($str)
     {
-        return (substr($str, -1) === 's' || substr($str, -1) === 'o') ? ($str . 'es') :
-                    (substr($str, -1) === 'y' ? (substr($str, 0, count($str) - 1) . 'ies') :
-                    ($str . 's'));
+        switch (substr($str, -1))
+        {
+        case 's':
+        case 'o':
+            return $str . 'es';
+        case 'y':
+            return substr($str, 0, count($str) - 1) . 'ies';
+        default:
+            return $str . 's';
+        }
     }
 }
 
