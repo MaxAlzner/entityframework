@@ -510,15 +510,7 @@ class EntityContext
             throw new Exception('Invalid number of arguments for method: ' . $method);
         }
         
-        for ($i = 0; $i < count($args); $i++)
-        {
-            $arg = &$args[$i];
-            $parameter = $schema['parameters'][$i];
-            
-            $arg = is_string($arg) ? ('"' . $arg . '"') : $arg;
-            $arg = $arg === null ? 'null' : $arg;
-        }
-        
+        $args = $this->validate_parameters($args, $schema['parameters']);
         $sql = 'call ' . $method . ' (' . implode(', ', $args) . ')';
         echo $sql . PHP_EOL;
         return $this->connection->query($sql);
@@ -532,19 +524,11 @@ class EntityContext
             throw new Exception('Invalid number of arguments for method: ' . $method);
         }
         
-        for ($i = 0; $i < count($args); $i++)
-        {
-            $arg = &$args[$i];
-            $parameter = $schema['parameters'][$i];
-            
-            $arg = is_string($arg) ? ('"' . $arg . '"') : $arg;
-            $arg = $arg === null ? 'null' : $arg;
-        }
-        
-        $sql = 'select ' . $method . ' (' . implode(', ', $args) . ')';
+        $args = $this->validate_parameters($args, $schema['parameters']);
+        $sql = $method . ' (' . implode(', ', $args) . ')';
         echo $sql . PHP_EOL;
-        $result = $this->connection->query($sql);
-        return current($result[0]);
+        $result = $this->connection->query('select ' . $sql, array($sql => $schema));
+        return $result[0][$sql];
     }
     
     protected function refresh_schema()
@@ -704,6 +688,20 @@ class EntityContext
             $file['schema'] = $this->schema;
             file_put_contents($this->filename, json_encode($file, JSON_PRETTY_PRINT));
         }
+    }
+    
+    protected function validate_parameters($arguments, $parameters)
+    {
+        for ($i = 0; $i < count($arguments); $i++)
+        {
+            $arg = &$arguments[$i];
+            $parameter = $parameters[$i];
+            
+            $arg = is_string($arg) ? ('"' . $arg . '"') : $arg;
+            $arg = $arg === null ? 'null' : $arg;
+        }
+        
+        return $arguments;
     }
     
     protected static function strpluralize($str)

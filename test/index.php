@@ -45,18 +45,6 @@ echo 'call functions' . PHP_EOL;
 echo json_encode($ctx->fx_Test(), JSON_PRETTY_PRINT) . PHP_EOL;
 echo json_encode($ctx->fx_CountLocationsByRent(9000.0), JSON_PRETTY_PRINT) . PHP_EOL;
 echo 'call prodcedures' . PHP_EOL;
-// echo json_encode($ctx->p_InsertUpdatePerson(
-//     4,
-//     null,
-//     'Money',
-//     null,
-//     'Bucks',
-//     null,
-//     'mr.money.bucks@web.mail',
-//     'invalid',
-//     'M'
-//     ), JSON_PRETTY_PRINT) . PHP_EOL;
-// echo json_encode($ctx->p_AllPeople(), JSON_PRETTY_PRINT) . PHP_EOL;
 echo json_encode($ctx->p_InsertUpdatePerson(
     4,
     'Mr.',
