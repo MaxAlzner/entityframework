@@ -84,27 +84,32 @@ class EntityConnection
     
     protected static function map_value($value, $type, $length)
     {
-        switch ($type)
+        if (!empty($value))
         {
-            case 'int':
-            case 'tinyint':
-            case 'smallint':
-            case 'mediumint':
-            case 'bigint':
-                return intval($value);
-                break;
-            case 'float':
-            case 'double':
-            case 'decimal':
-                return doubleval($value);
-                break;
-            case 'bit':
-                return $value === '1' ? true : false;
-                break;
-            default:
-                return substr(strval($value), 0, $length);
-                break;
+            switch ($type)
+            {
+                case 'int':
+                case 'tinyint':
+                case 'smallint':
+                case 'mediumint':
+                case 'bigint':
+                    return intval($value);
+                    break;
+                case 'float':
+                case 'double':
+                case 'decimal':
+                    return doubleval($value);
+                    break;
+                case 'bit':
+                    return $value === '1' ? true : false;
+                    break;
+                default:
+                    return substr(strval($value), 0, $length);
+                    break;
+            }
         }
+        
+        return null;
     }
 }
 

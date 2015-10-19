@@ -26,7 +26,7 @@ echo json_encode(
     ->where('AddressID = 4')
     ->single(),
     JSON_PRETTY_PRINT) . PHP_EOL;
-echo 'select 4 Countries' . PHP_EOL;
+echo 'select 4 States' . PHP_EOL;
 echo json_encode(
     $ctx->StateProvince
     ->inject('Country')
