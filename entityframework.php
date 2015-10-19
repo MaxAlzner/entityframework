@@ -39,11 +39,13 @@ class EntityObject
         $obj = new EntityObject($this->ctx, $this->query);
         if (!empty($statement) && is_string($statement))
         {
+            $obj->query['select'] = [];
             $statement = explode(',', $statement);
+            $schema = $this->ctx->get_table($this->query['from']);
             foreach ($statement as $column)
             {
                 $column = trim($column);
-                if (!array_key_exists($column, $obj->ctx->schema['tables'][$obj->query['from']]))
+                if (!array_key_exists($column, $schema))
                 {
                     throw new Exception('Column name is invalid: "' . $column . '"');
                 }
@@ -79,10 +81,11 @@ class EntityObject
         if (!empty($statement) && is_string($statement))
         {
             $statement = explode(',', $statement);
+            $schema = $this->ctx->get_table($this->query['from']);
             foreach ($statement as $column)
             {
                 $column = trim($column);
-                if (!array_key_exists($column, $obj->ctx->schema['tables'][$obj->query['from']]))
+                if (!array_key_exists($column, $schema))
                 {
                     throw new Exception('Column name is invalid: "' . $column . '"');
                 }
@@ -167,14 +170,13 @@ class EntityObject
         try
         {
             $query = $this->compile();
-            // echo $query . PHP_EOL;
             $result = $this->ctx->sql->query($query)->fetch_all(MYSQLI_ASSOC);
+            $schema = $this->ctx->get_table($this->query['from']);
             foreach ($result as &$row)
             {
                 foreach ($row as $columnName => &$column)
                 {
-                    $schema = $this->ctx->schema['tables'][$this->query['from']][$columnName];
-                    switch ($schema['type'])
+                    switch ($schema[$columnName]['type'])
                     {
                         case 'int':
                         case 'tinyint':
@@ -199,35 +201,43 @@ class EntityObject
                 }
             }
             
-            $links = $this->ctx->get_links($this->query['from']);
-            if (!empty($links) && !empty($this->query['include']))
+            $relationships = $this->ctx->get_table_relationships($this->query['from']);
+            if (!empty($relationships) && !empty($this->query['include']))
             {
                 foreach ($result as &$row)
                 {
-                    foreach ($links as $link)
+                    foreach ($relationships as $relationship)
                     {
                         foreach ($this->query['include'] as $navigation => $chain)
                         {
-                            if ($link['to']['property'] === $navigation)
+                            if ($relationship['to']['property'] === $navigation)
                             {
-                                $key = $row[$link['to']['key']];
-                                $key = is_string($key) ? ('"' . $key . '"') : $key;
-                                $row[$link['to']['property']] = $this->ctx
-                                    ->__get($link['from']['table'])
-                                    ->inject($chain)
-                                    ->where($link['from']['key'] . ' = ' . $key)
-                                    ->select();
+                                $key = $relationship['to']['key'];
+                                $property = $relationship['to']['property'];
+                                $table = $relationship['from']['table'];
+                                $reference = $relationship['from']['key'];
+                                $multiplicity = $relationship['to']['multiplicity'];
                             }
-                            else if ($link['from']['property'] === $navigation)
+                            else if ($relationship['from']['property'] === $navigation)
                             {
-                                $key = $row[$link['from']['key']];
-                                $key = is_string($key) ? ('"' . $key . '"') : $key;
-                                $row[$link['from']['property']] = $this->ctx
-                                    ->__get($link['to']['table'])
-                                    ->inject($chain)
-                                    ->where($link['to']['key'] . ' = ' . $key)
-                                    ->single();
+                                $key = $relationship['from']['key'];
+                                $property = $relationship['from']['property'];
+                                $table = $relationship['to']['table'];
+                                $reference = $relationship['to']['key'];
+                                $multiplicity = $relationship['from']['multiplicity'];
                             }
+                            else
+                            {
+                                continue;
+                            }
+                            
+                            $key = $row[$key];
+                            $key = is_string($key) ? ('"' . $key . '"') : $key;
+                            $obj = $this->ctx
+                                ->$table
+                                ->inject($chain)
+                                ->where($reference . ' = ' . $key);
+                            $row[$property] = $multiplicity === '*' ? $obj->select() : $obj->single();
                         }
                     }
                     
@@ -309,41 +319,175 @@ class EntityContext
     
     function __get($property)
     {
+        $table = $this->get_table($property);
+        if ($table !== false)
+        {
+            return new EntityObject($this, array('from' => $property));
+        }
+        
+        throw new Exception('Property is invalid or schema could not be found.');
+    }
+    
+    function __call($method, $args)
+    {
+        $routine = $this->get_procedure($method);
+        $isprocedure = $routine !== false;
+        $routine = $isprocedure ? $routine : $this->get_function($method);
+        if ($routine !== false)
+        {
+            $ctx = $this;
+            return call_user_func_array(
+                array(&$this, $isprocedure ? 'call_procedure' : 'call_function'),
+                array('method' => $method, 'args' => $args));
+        }
+        
+        throw new Exception('Method is invalid or schema could not be found: ' . $method);
+    }
+    
+    public function get_table($name)
+    {
         if (!empty($this->schema))
         {
             foreach ($this->schema['tables'] as $tableName => $table)
             {
-                if ($property === $tableName)
+                if ($name === $tableName)
                 {
-                    return new EntityObject($this, array('from' => $tableName));
+                    return $table;
+                }
+            }
+            
+            foreach ($this->schema['views'] as $viewName => $view)
+            {
+                if ($name === $viewName)
+                {
+                    return $view;
                 }
             }
         }
+        
+        return false;
     }
     
-    public function get_primary($table)
+    public function get_table_relationships($tableName)
     {
-        foreach ($this->schema['tables'][$table] as $columnName => $column)
+        $relationships = [];
+        if (!empty($this->schema))
         {
-            if ($column['primary'])
+            foreach ($this->schema['relationships'] as $key => $relationship)
             {
-                return $columnName;
-            }
-        }
-    }
-    
-    public function get_links($table)
-    {
-        $links = [];
-        foreach ($this->schema['links'] as $key => $link)
-        {
-            if ($link['from']['table'] === $table || $link['to']['table'] === $table)
-            {
-                $links[] = $link;
+                if ($relationship['from']['table'] === $tableName || $relationship['to']['table'] === $tableName)
+                {
+                    $relationships[] = $relationship;
+                }
             }
         }
         
-        return $links;
+        return $relationships;
+    }
+    
+    public function get_table_navigations($tableName)
+    {
+        $navigations = [];
+        if (!empty($this->schema))
+        {
+            foreach ($this->schema['relationships'] as $relationship)
+            {
+                if ($relationship['from']['table'] === $tableName)
+                {
+                    $navigations[] = $relationship['from']['property'];
+                }
+                else if ($relationship['to']['table'] === $tableName)
+                {
+                    $navigations[] = $relationship['to']['property'];
+                }
+            }
+        }
+        
+        return $navigations;
+    }
+    
+    public function get_procedure($name)
+    {
+        if (!empty($this->schema))
+        {
+            foreach ($this->schema['procedures'] as $procedureName => $procedure)
+            {
+                if ($name === $procedureName)
+                {
+                    return $procedure;
+                }
+            }
+        }
+        
+        return false;
+    }
+    
+    public function get_function($name)
+    {
+        if (!empty($this->schema))
+        {
+            foreach ($this->schema['functions'] as $functionName => $function)
+            {
+                if ($name === $functionName)
+                {
+                    return $function;
+                }
+            }
+        }
+        
+        return false;
+    }
+    
+    public function call_procedure($method, $args)
+    {
+        $schema = $this->schema['procedures'][$method];
+        if (count($schema['parameters']) !== count($args))
+        {
+            throw new Exception('Invalid number of arguments for method: ' . $method);
+        }
+        
+        for ($i = 0; $i < count($args); $i++)
+        {
+            $arg = &$args[$i];
+            $parameter = $schema['parameters'][$i];
+            
+            $arg = is_string($arg) ? ('"' . $arg . '"') : $arg;
+            $arg = $arg === null ? 'null' : $arg;
+        }
+        
+        $sql = 'call ' . $method . ' (' . implode(', ', $args) . ')';
+        echo $sql . PHP_EOL;
+        $result = $this->sql->query($sql);
+        if ($result instanceof mysqli_result)
+        {
+            $result = $result->fetch_all(MYSQLI_ASSOC);
+        }
+        
+        $this->sql->next_result();
+        return $result;
+    }
+    
+    public function call_function($method, $args)
+    {
+        $schema = $this->schema['functions'][$method];
+        if (count($schema['parameters']) !== count($args))
+        {
+            throw new Exception('Invalid number of arguments for method: ' . $method);
+        }
+        
+        for ($i = 0; $i < count($args); $i++)
+        {
+            $arg = &$args[$i];
+            $parameter = $schema['parameters'][$i];
+            
+            $arg = is_string($arg) ? ('"' . $arg . '"') : $arg;
+            $arg = $arg === null ? 'null' : $arg;
+        }
+        
+        $sql = 'select ' . $method . ' (' . implode(', ', $args) . ')';
+        echo $sql . PHP_EOL;
+        $result = $this->sql->query($sql)->fetch_all(MYSQLI_NUM)[0][0];
+        return self::map_value($result, $schema['type'], $schema['length']);
     }
     
     protected function reconnect()
@@ -378,14 +522,26 @@ class EntityContext
         
         $this->schema = array(
             'tables' => [],
-            'links' => []
+            'views' => [],
+            'procedures' => [],
+            'functions' => [],
+            'relationships' => []
             );
-        $tables = $this->sql->query('select table_name from information_schema.tables where table_schema = "' . $this->connection['database'] . '"')->fetch_all(MYSQLI_NUM);
+        $views = $this->sql
+            ->query('select table_name from information_schema.views where table_schema = "' . $this->connection['database'] . '"')->fetch_all(MYSQLI_NUM);
+        foreach ($views as &$name)
+        {
+            $name = $name[0];
+        }
+        
+        $tables = $this->sql
+            ->query('select table_name from information_schema.tables where table_schema = "' . $this->connection['database'] . '"')->fetch_all(MYSQLI_NUM);
         foreach ($tables as $table)
         {
             $tableName = $table[0];
             $table = array();
-            $columns = $this->sql->query('select * from information_schema.columns where table_name = "' . $tableName . '"');
+            $columns = $this->sql
+                ->query('select * from information_schema.columns where table_name = "' . $tableName . '"');
             foreach ($columns as $column)
             {
                 $table[$column['COLUMN_NAME']] = array(
@@ -393,40 +549,110 @@ class EntityContext
                     'length' => empty($column['NUMERIC_PRECISION']) ?
                         intval($column['CHARACTER_MAXIMUM_LENGTH']) :
                         intval($column['NUMERIC_PRECISION']),
-                    'nullable' => $column['IS_NULLABLE'] === 'YES' ? true : false,
-                    // 'primary' => false
+                    'nullable' => $column['IS_NULLABLE'] === 'YES' ? true : false
                     );
             }
             
-            $this->schema['tables'][$tableName] = $table;
+            $this->schema[array_search($tableName, $views) === false ? 'tables' : 'views'][$tableName] = $table;
         }
         
-        $keys = $this->sql->query('select * from information_schema.key_column_usage where table_schema = "' . $this->connection['database'] . '"');
+        $routines = $this->sql
+            ->query('select * from information_schema.routines where routine_schema = "' . $this->connection['database'] . '"');
+        foreach ($routines as $routine)
+        {
+            $routineName = $routine['ROUTINE_NAME'];
+            if ($routine['ROUTINE_TYPE'] === 'PROCEDURE')
+            {
+                $this->schema['procedures'][$routineName] = array(
+                    'parameters' => []
+                    );
+                $routine = &$this->schema['procedures'][$routineName];
+            }
+            else if ($routine['ROUTINE_TYPE'] === 'FUNCTION')
+            {
+                $this->schema['functions'][$routineName] = array(
+                    'type' => $routine['DATA_TYPE'],
+                    'length' => empty($routine['NUMERIC_PRECISION']) ?
+                        intval($routine['CHARACTER_MAXIMUM_LENGTH']) :
+                        intval($routine['NUMERIC_PRECISION']),
+                    'parameters' => []
+                    );
+                $routine = &$this->schema['functions'][$routineName];
+            }
+            
+            $parameters = $this->sql
+                ->query('select * from information_schema.parameters where specific_name = "' . $routineName . '"');
+            foreach ($parameters as $parameter)
+            {
+                if (!empty($parameter['PARAMETER_MODE']) && !empty($parameter['PARAMETER_NAME']))
+                {
+                    $routine['parameters'][intval($parameter['ORDINAL_POSITION']) - 1] = array(
+                        'mode' => strtolower($parameter['PARAMETER_MODE']),
+                        'name' => $parameter['PARAMETER_NAME'],
+                        'type' => $parameter['DATA_TYPE'],
+                        'length' => empty($parameter['NUMERIC_PRECISION']) ?
+                            intval($parameter['CHARACTER_MAXIMUM_LENGTH']) :
+                            intval($parameter['NUMERIC_PRECISION'])
+                        );
+                }
+            }
+            
+            unset($routine);
+        }
+        
+        $keys = $this->sql
+            ->query('select
+            c.constraint_catalog,
+            c.constraint_schema,
+            c.constraint_name,
+            k.table_catalog,
+            c.table_schema,
+            c.table_name,
+            k.column_name,
+            c.constraint_type,
+            k.ordinal_position,
+            k.position_in_unique_constraint,
+            k.referenced_table_schema,
+            k.referenced_table_name,
+            k.referenced_column_name
+            from information_schema.table_constraints as c
+            inner join information_schema.key_column_usage as k
+                on k.constraint_name = c.constraint_name and k.table_name = c.table_name
+            where c.table_schema = "' . $this->connection['database'] . '"');
         foreach ($keys as $key)
         {
-            if ($key['CONSTRAINT_NAME'] === 'PRIMARY')
+            if ($key['constraint_type'] === 'PRIMARY KEY')
             {
-                $this->schema['tables'][$key['TABLE_NAME']][$key['COLUMN_NAME']]['primary'] = true;
+                $this->schema['tables'][$key['table_name']][$key['column_name']]['primary'] = true;
             }
-            else if (strtolower(substr($key['CONSTRAINT_NAME'], -7)) === '_ibfk_1' || strtolower(substr($key['CONSTRAINT_NAME'], 0, 3)) === 'fk_')
+            else if ($key['constraint_type'] === 'UNIQUE')
             {
-                $principal = $key['TABLE_NAME'];
-                $dependent = $key['REFERENCED_TABLE_NAME'];
-                $property = substr($principal, -1) === 's' ? ($principal . 'es') :
-                    (substr($principal, -1) === 'y' ? (substr($principal, 0, count($principal) - 1) . 'ies') :
-                    ($principal . 's'));
-                $this->schema['links'][$key['CONSTRAINT_NAME']] = array(
+                $this->schema['tables'][$key['table_name']][$key['column_name']]['unique'] = true;
+            }
+        }
+        
+        foreach ($keys as $key)
+        {
+            if ($key['constraint_type'] === 'FOREIGN KEY')
+            {
+                $principalName = $key['table_name'];
+                $dependentName = $key['referenced_table_name'];
+                $principal = $this->schema['tables'][$principalName];
+                $dependent = $this->schema['tables'][$dependentName];
+                $coupled = $principal[$key['column_name']]['primary'] && $dependent[$key['referenced_column_name']]['primary'];
+                $property = $coupled ? $principalName : self::strpluralize($principalName);
+                $this->schema['relationships'][$key['constraint_name']] = array(
                     'from' => array(
-                        'table' => $principal,
-                        'key' => $key['COLUMN_NAME'],
-                        'property' => $dependent,
-                        'multiplicity' => $this->schema['tables'][$principal][$key['COLUMN_NAME']]['nullable'] ? '0..1' : '1'
+                        'table' => $principalName,
+                        'key' => $key['column_name'],
+                        'property' => $dependentName,
+                        'multiplicity' => $coupled ? '1' : ($principal[$key['column_name']]['nullable'] ? '0..1' : '1')
                         ),
                     'to' => array(
-                        'table' => $dependent,
-                        'key' => $key['REFERENCED_COLUMN_NAME'],
+                        'table' => $dependentName,
+                        'key' => $key['referenced_column_name'],
                         'property' => $property,
-                        'multiplicity' => '*'
+                        'multiplicity' => $coupled ? '1' : '*'
                         )
                     );
             }
@@ -438,6 +664,38 @@ class EntityContext
             $file['schema'] = $this->schema;
             file_put_contents($this->filename, json_encode($file, JSON_PRETTY_PRINT));
         }
+    }
+    
+    protected static function map_value($value, $type, $length)
+    {
+        switch ($type)
+        {
+            case 'int':
+            case 'tinyint':
+            case 'smallint':
+            case 'mediumint':
+            case 'bigint':
+                return intval($value);
+                break;
+            case 'float':
+            case 'double':
+            case 'decimal':
+                return doubleval($value);
+                break;
+            case 'bit':
+                return $value === '1' ? true : false;
+                break;
+            default:
+                return substr(strval($value), 0, $length);
+                break;
+        }
+    }
+    
+    protected static function strpluralize($str)
+    {
+        return (substr($str, -1) === 's' || substr($str, -1) === 'o') ? ($str . 'es') :
+                    (substr($str, -1) === 'y' ? (substr($str, 0, count($str) - 1) . 'ies') :
+                    ($str . 's'));
     }
 }
 

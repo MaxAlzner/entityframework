@@ -34,8 +34,7 @@ create table Address
 
 create table Location
 (
-    LocationID int not null primary key auto_increment,
-    AddressID int not null,
+    AddressID int not null primary key,
     IsCommercial bit not null default 0,
     IsInsured bit not null default 0,
     OccpancyLimit int null,
@@ -48,26 +47,36 @@ create table Location
 create table Person
 (
     PersonID int not null primary key auto_increment,
-    LocationID int null,
+    AddressID int null,
     Salutation varchar(4) null,
     FirstName varchar(64) not null,
     MiddleName varchar(64) null,
     LastName varchar(64) not null,
     Cadency varchar(4) null,
-    EmailAddress varchar(256) not null,
+    EmailAddress varchar(255) not null unique key,
     PhoneNumber varchar(80) null,
     GenderCode char not null,
-    foreign key fk_Location(LocationID) references Location(LocationID)
+    foreign key fk_Address(AddressID) references Address(AddressID)
         on update cascade
         on delete cascade
 );
 
+drop view if exists CountryState;
 drop view if exists Residence;
+drop view if exists Business;
+
+create view CountryState
+as
+    select
+        c.Name as Country,
+        sp.Name as State
+    from StateProvince as sp
+    left join Country as c
+        on sp.CountryCode = c.Code;
 
 create view Residence
 as
     select
-        Location.LocationID,
         Address.AddressID as AddressID,
         Street,
         Subdivision,
@@ -76,15 +85,37 @@ as
         PostalCode,
         IsInsured,
         OccpancyLimit,
-        -- sum(select PersonID from Person where Person.LocationID = Location.LocationID) as Occupants,
+        -- sum(select PersonID from Person where Person.AddressID = Location.AddressID) as Occupants,
         Rent
     from Location
     left join Address
         on Location.AddressID = Address.AddressID
     left join Person
-        on Person.LocationID is not null and Location.LocationID = Person.LocationID
+        on Person.AddressID is not null and Location.AddressID = Person.AddressID
     where
         IsCommercial = 0;
+
+create view Business
+as
+    select
+        Address.AddressID as AddressID,
+        Street,
+        Subdivision,
+        City,
+        StateProvinceCode,
+        PostalCode,
+        IsInsured,
+        OccpancyLimit,
+        Rent,
+        Person.EmailAddress as OwnerEmailAddress,
+        Person.PhoneNumber as OwnerPhoneNumber
+    from Location
+    left join Address
+        on Location.AddressID = Address.AddressID
+    left join Person
+        on Person.AddressID is not null and Location.AddressID = Person.AddressID
+    where
+        IsCommercial = 1;
 
 insert into Country (Code, Name)
 values
@@ -176,7 +207,73 @@ values
     (4, 1, 1, null, 8000.00);
 
 insert into Person
-    (LocationID, Salutation, FirstName, MiddleName, LastName, Cadency, EmailAddress, PhoneNumber, GenderCode)
+    (AddressID, Salutation, FirstName, MiddleName, LastName, Cadency, EmailAddress, PhoneNumber, GenderCode)
 values
     (1, null, 'John', null, 'Doe', 'Sr', 'john.doe@web.mail', '3091236589', 'M'),
-    (1, null, 'Jane', null, 'Doe', null, 'jane.doe@web.mail', '3091236589', 'F');
+    (1, null, 'Jane', null, 'Doe', null, 'jane.doe@web.mail', '3091236589', 'F'),
+    (4, null, 'Money', null, 'Bucks', null, 'mr.money.bucks@web.mail', '3095549513', 'M');
+
+drop procedure if exists p_AllPeople;
+drop procedure if exists p_InsertUpdatePerson;
+drop function if exists fx_Test;
+drop function if exists fx_CountLocationsByRent;
+
+delimiter //
+
+create procedure p_AllPeople ()
+begin
+    select * from Person;
+end //
+
+create procedure p_InsertUpdatePerson
+(
+    in _AddressID int,
+    in _Salutation varchar(4),
+    in _FirstName varchar(64),
+    in _MiddleName varchar(64),
+    in _LastName varchar(64),
+    in _Cadency varchar(4),
+    in _EmailAddress varchar(256),
+    in _PhoneNumber varchar(80),
+    in _GenderCode char
+)
+begin
+    if exists(select PersonID from Person where EmailAddress = _EmailAddress) then
+        update Person
+        set
+            AddressID = _AddressID,
+            Salutation = _Salutation,
+            FirstName = _FirstName,
+            MiddleName = _MiddleName,
+            LastName = _LastName,
+            Cadency = _Cadency,
+            PhoneNumber = _PhoneNumber,
+            GenderCode = _GenderCode
+        where
+            EmailAddress = _EmailAddress;
+    else
+        insert into Person
+            (AddressID, Salutation, FirstName, MiddleName, LastName, Cadency, EmailAddress, PhoneNumber, GenderCode)
+        values
+            (_AddressID, _Salutation, _FirstName, _MiddleName, _LastName, _Cadency, _EmailAddress, _PhoneNumber, _GenderCode);
+    end if;
+end //
+
+create function fx_Test ()
+returns varchar(80)
+begin
+    return 'Hello World!';
+end //
+
+create function fx_CountLocationsByRent
+(
+    _Rent decimal
+)
+returns int
+begin
+    return (
+        select count(*) from Location where Rent <= _Rent
+    );
+end //
+
+delimiter ;

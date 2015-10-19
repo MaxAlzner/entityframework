@@ -42,15 +42,6 @@
                     "type": "varchar",
                     "length": 16,
                     "nullable": false
-                },
-                "Code": {
-                    "primary": true
-                },
-                "LocationID": {
-                    "primary": true
-                },
-                "PersonID": {
-                    "primary": true
                 }
             },
             "Country": {
@@ -64,24 +55,9 @@
                     "type": "varchar",
                     "length": 128,
                     "nullable": false
-                },
-                "AddressID": {
-                    "primary": true
-                },
-                "LocationID": {
-                    "primary": true
-                },
-                "PersonID": {
-                    "primary": true
                 }
             },
             "Location": {
-                "LocationID": {
-                    "type": "int",
-                    "length": 10,
-                    "nullable": false,
-                    "primary": true
-                },
                 "AddressID": {
                     "type": "int",
                     "length": 10,
@@ -107,12 +83,6 @@
                     "type": "decimal",
                     "length": 10,
                     "nullable": true
-                },
-                "Code": {
-                    "primary": true
-                },
-                "PersonID": {
-                    "primary": true
                 }
             },
             "Person": {
@@ -122,11 +92,10 @@
                     "nullable": false,
                     "primary": true
                 },
-                "LocationID": {
+                "AddressID": {
                     "type": "int",
                     "length": 10,
-                    "nullable": true,
-                    "primary": true
+                    "nullable": true
                 },
                 "Salutation": {
                     "type": "varchar",
@@ -155,8 +124,9 @@
                 },
                 "EmailAddress": {
                     "type": "varchar",
-                    "length": 256,
-                    "nullable": false
+                    "length": 255,
+                    "nullable": false,
+                    "unique": true
                 },
                 "PhoneNumber": {
                     "type": "varchar",
@@ -167,26 +137,33 @@
                     "type": "char",
                     "length": 1,
                     "nullable": false
-                },
-                "AddressID": {
-                    "primary": true
-                },
-                "Code": {
-                    "primary": true
                 }
             },
-            "Residence": {
-                "LocationID": {
-                    "type": "int",
-                    "length": 10,
+            "StateProvince": {
+                "Code": {
+                    "type": "varchar",
+                    "length": 2,
                     "nullable": false,
                     "primary": true
                 },
+                "CountryCode": {
+                    "type": "varchar",
+                    "length": 2,
+                    "nullable": false
+                },
+                "Name": {
+                    "type": "varchar",
+                    "length": 128,
+                    "nullable": false
+                }
+            }
+        },
+        "views": {
+            "Business": {
                 "AddressID": {
                     "type": "int",
                     "length": 10,
-                    "nullable": true,
-                    "primary": true
+                    "nullable": true
                 },
                 "Street": {
                     "type": "varchar",
@@ -228,42 +205,164 @@
                     "length": 10,
                     "nullable": true
                 },
-                "Code": {
-                    "primary": true
+                "OwnerEmailAddress": {
+                    "type": "varchar",
+                    "length": 255,
+                    "nullable": true
                 },
-                "PersonID": {
-                    "primary": true
+                "OwnerPhoneNumber": {
+                    "type": "varchar",
+                    "length": 80,
+                    "nullable": true
                 }
             },
-            "StateProvince": {
-                "Code": {
+            "CountryState": {
+                "Country": {
                     "type": "varchar",
-                    "length": 2,
-                    "nullable": false,
-                    "primary": true
+                    "length": 128,
+                    "nullable": true
                 },
-                "CountryCode": {
-                    "type": "varchar",
-                    "length": 2,
-                    "nullable": false
-                },
-                "Name": {
+                "State": {
                     "type": "varchar",
                     "length": 128,
                     "nullable": false
-                },
+                }
+            },
+            "Residence": {
                 "AddressID": {
-                    "primary": true
+                    "type": "int",
+                    "length": 10,
+                    "nullable": true
                 },
-                "LocationID": {
-                    "primary": true
+                "Street": {
+                    "type": "varchar",
+                    "length": 256,
+                    "nullable": true
                 },
-                "PersonID": {
-                    "primary": true
+                "Subdivision": {
+                    "type": "varchar",
+                    "length": 32,
+                    "nullable": true
+                },
+                "City": {
+                    "type": "varchar",
+                    "length": 128,
+                    "nullable": true
+                },
+                "StateProvinceCode": {
+                    "type": "varchar",
+                    "length": 2,
+                    "nullable": true
+                },
+                "PostalCode": {
+                    "type": "varchar",
+                    "length": 16,
+                    "nullable": true
+                },
+                "IsInsured": {
+                    "type": "bit",
+                    "length": 1,
+                    "nullable": false
+                },
+                "OccpancyLimit": {
+                    "type": "int",
+                    "length": 10,
+                    "nullable": true
+                },
+                "Rent": {
+                    "type": "decimal",
+                    "length": 10,
+                    "nullable": true
                 }
             }
         },
-        "links": {
+        "procedures": {
+            "p_AllPeople": {
+                "parameters": [
+
+                ]
+            },
+            "p_InsertUpdatePerson": {
+                "parameters": [
+                    {
+                        "mode": "in",
+                        "name": "_AddressID",
+                        "type": "int",
+                        "length": 10
+                    },
+                    {
+                        "mode": "in",
+                        "name": "_Salutation",
+                        "type": "varchar",
+                        "length": 4
+                    },
+                    {
+                        "mode": "in",
+                        "name": "_FirstName",
+                        "type": "varchar",
+                        "length": 64
+                    },
+                    {
+                        "mode": "in",
+                        "name": "_MiddleName",
+                        "type": "varchar",
+                        "length": 64
+                    },
+                    {
+                        "mode": "in",
+                        "name": "_LastName",
+                        "type": "varchar",
+                        "length": 64
+                    },
+                    {
+                        "mode": "in",
+                        "name": "_Cadency",
+                        "type": "varchar",
+                        "length": 4
+                    },
+                    {
+                        "mode": "in",
+                        "name": "_EmailAddress",
+                        "type": "varchar",
+                        "length": 256
+                    },
+                    {
+                        "mode": "in",
+                        "name": "_PhoneNumber",
+                        "type": "varchar",
+                        "length": 80
+                    },
+                    {
+                        "mode": "in",
+                        "name": "_GenderCode",
+                        "type": "char",
+                        "length": 1
+                    }
+                ]
+            }
+        },
+        "functions": {
+            "fx_CountLocationsByRent": {
+                "type": "int",
+                "length": 10,
+                "parameters": [
+                    {
+                        "mode": "in",
+                        "name": "_Rent",
+                        "type": "decimal",
+                        "length": 10
+                    }
+                ]
+            },
+            "fx_Test": {
+                "type": "varchar",
+                "length": 80,
+                "parameters": [
+
+                ]
+            }
+        },
+        "relationships": {
             "Address_ibfk_1": {
                 "from": {
                     "table": "Address",
@@ -288,20 +387,20 @@
                 "to": {
                     "table": "Address",
                     "key": "AddressID",
-                    "property": "Locations",
-                    "multiplicity": "*"
+                    "property": "Location",
+                    "multiplicity": "1"
                 }
             },
             "Person_ibfk_1": {
                 "from": {
                     "table": "Person",
-                    "key": "LocationID",
-                    "property": "Location",
+                    "key": "AddressID",
+                    "property": "Address",
                     "multiplicity": "0..1"
                 },
                 "to": {
-                    "table": "Location",
-                    "key": "LocationID",
+                    "table": "Address",
+                    "key": "AddressID",
                     "property": "Persons",
                     "multiplicity": "*"
                 }
