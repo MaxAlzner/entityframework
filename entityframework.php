@@ -512,7 +512,6 @@ class EntityContext
         
         $args = $this->validate_parameters($args, $schema['parameters']);
         $sql = 'call ' . $method . ' (' . implode(', ', $args) . ')';
-        echo $sql . PHP_EOL;
         return $this->connection->query($sql);
     }
     
@@ -526,7 +525,6 @@ class EntityContext
         
         $args = $this->validate_parameters($args, $schema['parameters']);
         $sql = $method . ' (' . implode(', ', $args) . ')';
-        echo $sql . PHP_EOL;
         $result = $this->connection->query('select ' . $sql, array($sql => $schema));
         return $result[0][$sql];
     }
