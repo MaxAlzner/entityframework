@@ -707,18 +707,26 @@ class EntityContext
         return $arguments;
     }
     
-    protected static function strpluralize($str)
+    public static function strpluralize($str)
     {
-        switch (substr($str, -1))
+        if (in_array(substr($str, -1), ['o', 's', 'x', 'z']) || in_array(substr($str, -2), ['ch', 'sh']))
         {
-        case 's':
-        case 'o':
             return $str . 'es';
-        case 'y':
-            return substr($str, 0, count($str) - 1) . 'ies';
-        default:
-            return $str . 's';
         }
+        else if (preg_match('/f$/', $str))
+        {
+            return substr($str, 0, strlen($str) - 1) . 'ves';
+        }
+        else if (preg_match('/fe$/', $str))
+        {
+            return substr($str, 0, strlen($str) - 2) . 'ves';
+        }
+        else if (preg_match('/y$/', $str))
+        {
+            return substr($str, 0, strlen($str) - 1) . 'ies';
+        }
+        
+        return $str . 's';
     }
 }
 
