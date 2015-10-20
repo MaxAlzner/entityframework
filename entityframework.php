@@ -707,7 +707,7 @@ class EntityContext
         return $arguments;
     }
     
-    public static function strpluralize($str)
+    protected static function strpluralize($str)
     {
         if (in_array(substr($str, -1), ['o', 's', 'x', 'z']) || in_array(substr($str, -2), ['ch', 'sh']))
         {
