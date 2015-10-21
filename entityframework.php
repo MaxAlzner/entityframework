@@ -349,7 +349,8 @@ class EntityContext
     public $filename = null;
     public $connection = null;
     public $settings = array(
-        'alwaysRefreshSchema' => false
+        'alwaysRefreshSchema' => false,
+        'pluralizeNavigation' => true
         );
     public $schema = null;
     function __construct($file = null)
@@ -384,6 +385,20 @@ class EntityContext
                 $this->schema = $file['schema'];
             }
         }
+    }
+    
+    function __toString()
+    {
+        return json_encode(array(
+            'connection' => array(
+                'host' => $this->connection->host,
+                'user' => $this->connection->user,
+                'password' => $this->connection->password,
+                'database' => $this->connection->database,
+                'port' => $this->connection->port),
+            'settings' => $this->settings,
+            'schema' => $this->schema
+            ), JSON_PRETTY_PRINT);
     }
     
     function __get($property)
@@ -667,7 +682,7 @@ class EntityContext
                 $principal = $this->schema['tables'][$principalName];
                 $dependent = $this->schema['tables'][$dependentName];
                 $coupled = $principal[$key['column_name']]['primary'] && $dependent[$key['referenced_column_name']]['primary'];
-                $property = $coupled ? $principalName : self::strpluralize($principalName);
+                $property = $coupled || !$this->settings['pluralizeNavigation'] ? $principalName : self::strpluralize($principalName);
                 $this->schema['relationships'][$key['constraint_name']] = array(
                     'from' => array(
                         'table' => $principalName,
@@ -709,7 +724,7 @@ class EntityContext
     
     protected static function strpluralize($str)
     {
-        if (in_array(substr($str, -1), ['o', 's', 'x', 'z']) || in_array(substr($str, -2), ['ch', 'sh']))
+        if (in_array(substr($str, -1), ['s', 'x', 'z']) || in_array(substr($str, -2), ['ch', 'sh']))
         {
             return $str . 'es';
         }
@@ -720,6 +735,10 @@ class EntityContext
         else if (preg_match('/fe$/', $str))
         {
             return substr($str, 0, strlen($str) - 2) . 'ves';
+        }
+        else if (preg_match('/is$/', $str))
+        {
+            return substr($str, 0, strlen($str) - 2) . 'es';
         }
         else if (preg_match('/y$/', $str))
         {
