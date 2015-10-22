@@ -84,7 +84,7 @@ class EntityConnection
     
     protected static function map_value($value, $type, $length)
     {
-        if (!empty($value))
+        if ($value !== null)
         {
             switch ($type)
             {
