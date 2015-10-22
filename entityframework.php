@@ -103,8 +103,19 @@ class EntityConnection
                 case 'bit':
                     return $value === '1' ? true : false;
                     break;
-                default:
+                case 'char':
+                case 'varchar':
+                case 'blob':
+                case 'text':
+                case 'tinyblob':
+                case 'tinytext':
+                case 'mediumblob':
+                case 'mediumtext':
+                case 'longblob':
+                case 'longtext':
                     return substr(strval($value), 0, $length);
+                default:
+                    return $value;
                     break;
             }
         }
@@ -264,8 +275,9 @@ class EntityObject
     
     protected function compile()
     {
+        $columns = empty($this->query['select']) ? $this->ctx->get_table_columns($this->query['from']) : $this->query['select'];
         $sql = 'select ';
-        $sql .= empty($this->query['select']) ? '* ' : (implode(', ', $this->query['select']) . ' ');
+        $sql .= implode(', ', $columns) . ' ';
         $sql .= 'from ' . $this->query['from'] . ' ';
         if (!empty($this->query['where']))
         {
@@ -452,6 +464,30 @@ class EntityContext
         return false;
     }
     
+    public function get_table_columns($name)
+    {
+        if (!empty($this->schema))
+        {
+            foreach ($this->schema['tables'] as $tableName => $table)
+            {
+                if ($name === $tableName)
+                {
+                    return array_keys($table);
+                }
+            }
+            
+            foreach ($this->schema['views'] as $viewName => $view)
+            {
+                if ($name === $viewName)
+                {
+                    return array_keys($view);
+                }
+            }
+        }
+        
+        return [];
+    }
+    
     public function get_table_relationships($tableName)
     {
         $relationships = [];
@@ -582,13 +618,28 @@ class EntityContext
                 where table_name = "' . $tableName . '"');
             foreach ($columns as $column)
             {
-                $table[$column['COLUMN_NAME']] = array(
-                    'type' => $column['DATA_TYPE'],
-                    'length' => empty($column['NUMERIC_PRECISION']) ?
-                        intval($column['CHARACTER_MAXIMUM_LENGTH']) :
-                        intval($column['NUMERIC_PRECISION']),
-                    'nullable' => $column['IS_NULLABLE'] === 'YES' ? true : false
-                    );
+                $schema = array('type' => $column['DATA_TYPE']);
+                if (!empty($column['NUMERIC_PRECISION']))
+                {
+                    $schema['length'] = intval($column['NUMERIC_PRECISION']);
+                }
+                else if (!empty($column['CHARACTER_MAXIMUM_LENGTH']))
+                {
+                    $schema['length'] = intval($column['CHARACTER_MAXIMUM_LENGTH']);
+                }
+                
+                if ($column['IS_NULLABLE'] === 'YES')
+                {
+                    $schema['nullable'] = true;
+                }
+                
+                $table[$column['COLUMN_NAME']] = $schema;
+                // $table[$column['COLUMN_NAME']] = array(
+                //     'type' => $column['DATA_TYPE'],
+                //     'length' => !empty($column['NUMERIC_PRECISION']) ? intval($column['NUMERIC_PRECISION']) :
+                //         (!empty($column['CHARACTER_MAXIMUM_LENGTH']) ? intval($column['CHARACTER_MAXIMUM_LENGTH']) : null),
+                //     'nullable' => $column['IS_NULLABLE'] === 'YES' ? true : false
+                //     );
             }
             
             $this->schema[array_search($tableName, $views) === false ? 'tables' : 'views'][$tableName] = $table;

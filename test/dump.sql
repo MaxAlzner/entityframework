@@ -56,6 +56,7 @@ create table Person
     EmailAddress varchar(255) not null unique key,
     PhoneNumber varchar(80) null,
     GenderCode char not null,
+    LastUpdated datetime null,
     foreign key fk_Address(AddressID) references Address(AddressID)
         on update cascade
         on delete cascade
@@ -116,6 +117,72 @@ as
         on Person.AddressID is not null and Location.AddressID = Person.AddressID
     where
         IsCommercial = 1;
+
+drop procedure if exists p_AllPeople;
+drop procedure if exists p_InsertUpdatePerson;
+drop function if exists fx_Test;
+drop function if exists fx_CountLocationsByRent;
+
+delimiter //
+
+create procedure p_AllPeople ()
+begin
+    select * from Person;
+end //
+
+create procedure p_InsertUpdatePerson
+(
+    in _AddressID int,
+    in _Salutation varchar(4),
+    in _FirstName varchar(64),
+    in _MiddleName varchar(64),
+    in _LastName varchar(64),
+    in _Cadency varchar(4),
+    in _EmailAddress varchar(256),
+    in _PhoneNumber varchar(80),
+    in _GenderCode char
+)
+begin
+    if exists(select PersonID from Person where EmailAddress = _EmailAddress) then
+        update Person
+        set
+            AddressID = _AddressID,
+            Salutation = _Salutation,
+            FirstName = _FirstName,
+            MiddleName = _MiddleName,
+            LastName = _LastName,
+            Cadency = _Cadency,
+            PhoneNumber = _PhoneNumber,
+            GenderCode = _GenderCode,
+            LastUpdated = now()
+        where
+            EmailAddress = _EmailAddress;
+    else
+        insert into Person
+            (AddressID, Salutation, FirstName, MiddleName, LastName, Cadency, EmailAddress, PhoneNumber, GenderCode, LastUpdated)
+        values
+            (_AddressID, _Salutation, _FirstName, _MiddleName, _LastName, _Cadency, _EmailAddress, _PhoneNumber, _GenderCode, now());
+    end if;
+end //
+
+create function fx_Test ()
+returns varchar(80)
+begin
+    return 'Hello World!';
+end //
+
+create function fx_CountLocationsByRent
+(
+    _Rent decimal
+)
+returns int
+begin
+    return (
+        select count(*) from Location where Rent <= _Rent
+    );
+end //
+
+delimiter ;
 
 insert into Country (Code, Name)
 values
@@ -206,74 +273,6 @@ values
     (2, 0, 0, null, null),
     (4, 1, 1, null, 8000.00);
 
-insert into Person
-    (AddressID, Salutation, FirstName, MiddleName, LastName, Cadency, EmailAddress, PhoneNumber, GenderCode)
-values
-    (1, null, 'John', null, 'Doe', 'Sr', 'john.doe@web.mail', '3091236589', 'M'),
-    (1, null, 'Jane', null, 'Doe', null, 'jane.doe@web.mail', '3091236589', 'F'),
-    (4, null, 'Money', null, 'Bucks', null, 'mr.money.bucks@web.mail', '3095549513', 'M');
-
-drop procedure if exists p_AllPeople;
-drop procedure if exists p_InsertUpdatePerson;
-drop function if exists fx_Test;
-drop function if exists fx_CountLocationsByRent;
-
-delimiter //
-
-create procedure p_AllPeople ()
-begin
-    select * from Person;
-end //
-
-create procedure p_InsertUpdatePerson
-(
-    in _AddressID int,
-    in _Salutation varchar(4),
-    in _FirstName varchar(64),
-    in _MiddleName varchar(64),
-    in _LastName varchar(64),
-    in _Cadency varchar(4),
-    in _EmailAddress varchar(256),
-    in _PhoneNumber varchar(80),
-    in _GenderCode char
-)
-begin
-    if exists(select PersonID from Person where EmailAddress = _EmailAddress) then
-        update Person
-        set
-            AddressID = _AddressID,
-            Salutation = _Salutation,
-            FirstName = _FirstName,
-            MiddleName = _MiddleName,
-            LastName = _LastName,
-            Cadency = _Cadency,
-            PhoneNumber = _PhoneNumber,
-            GenderCode = _GenderCode
-        where
-            EmailAddress = _EmailAddress;
-    else
-        insert into Person
-            (AddressID, Salutation, FirstName, MiddleName, LastName, Cadency, EmailAddress, PhoneNumber, GenderCode)
-        values
-            (_AddressID, _Salutation, _FirstName, _MiddleName, _LastName, _Cadency, _EmailAddress, _PhoneNumber, _GenderCode);
-    end if;
-end //
-
-create function fx_Test ()
-returns varchar(80)
-begin
-    return 'Hello World!';
-end //
-
-create function fx_CountLocationsByRent
-(
-    _Rent decimal
-)
-returns int
-begin
-    return (
-        select count(*) from Location where Rent <= _Rent
-    );
-end //
-
-delimiter ;
+call p_InsertUpdatePerson (1, null, 'John', null, 'Doe', 'Sr', 'john.doe@web.mail', '3091236589', 'M');
+call p_InsertUpdatePerson (1, null, 'Jane', null, 'Doe', null, 'jane.doe@web.mail', '3091236589', 'F');
+call p_InsertUpdatePerson (4, null, 'Money', null, 'Bucks', null, 'mr.money.bucks@web.mail', '3095549513', 'M');

@@ -15,13 +15,11 @@
                 "AddressID": {
                     "type": "int",
                     "length": 10,
-                    "nullable": false,
                     "primary": true
                 },
                 "Street": {
                     "type": "varchar",
-                    "length": 256,
-                    "nullable": false
+                    "length": 256
                 },
                 "Subdivision": {
                     "type": "varchar",
@@ -30,49 +28,41 @@
                 },
                 "City": {
                     "type": "varchar",
-                    "length": 128,
-                    "nullable": false
+                    "length": 128
                 },
                 "StateProvinceCode": {
                     "type": "varchar",
-                    "length": 2,
-                    "nullable": false
+                    "length": 2
                 },
                 "PostalCode": {
                     "type": "varchar",
-                    "length": 16,
-                    "nullable": false
+                    "length": 16
                 }
             },
             "Country": {
                 "Code": {
                     "type": "varchar",
                     "length": 2,
-                    "nullable": false,
                     "primary": true
                 },
                 "Name": {
                     "type": "varchar",
-                    "length": 128,
-                    "nullable": false
+                    "length": 128
                 }
             },
             "Location": {
                 "AddressID": {
                     "type": "int",
                     "length": 10,
-                    "nullable": false,
                     "primary": true
                 },
                 "IsCommercial": {
                     "type": "bit",
-                    "length": 1,
-                    "nullable": false
+                    "length": 1
                 },
                 "IsInsured": {
                     "type": "bit",
-                    "length": 1,
-                    "nullable": false
+                    "length": 1
                 },
                 "OccpancyLimit": {
                     "type": "int",
@@ -89,7 +79,6 @@
                 "PersonID": {
                     "type": "int",
                     "length": 10,
-                    "nullable": false,
                     "primary": true
                 },
                 "AddressID": {
@@ -104,8 +93,7 @@
                 },
                 "FirstName": {
                     "type": "varchar",
-                    "length": 64,
-                    "nullable": false
+                    "length": 64
                 },
                 "MiddleName": {
                     "type": "varchar",
@@ -114,8 +102,7 @@
                 },
                 "LastName": {
                     "type": "varchar",
-                    "length": 64,
-                    "nullable": false
+                    "length": 64
                 },
                 "Cadency": {
                     "type": "varchar",
@@ -125,7 +112,6 @@
                 "EmailAddress": {
                     "type": "varchar",
                     "length": 255,
-                    "nullable": false,
                     "unique": true
                 },
                 "PhoneNumber": {
@@ -135,26 +121,26 @@
                 },
                 "GenderCode": {
                     "type": "char",
-                    "length": 1,
-                    "nullable": false
+                    "length": 1
+                },
+                "LastUpdated": {
+                    "type": "datetime",
+                    "nullable": true
                 }
             },
             "StateProvince": {
                 "Code": {
                     "type": "varchar",
                     "length": 2,
-                    "nullable": false,
                     "primary": true
                 },
                 "CountryCode": {
                     "type": "varchar",
-                    "length": 2,
-                    "nullable": false
+                    "length": 2
                 },
                 "Name": {
                     "type": "varchar",
-                    "length": 128,
-                    "nullable": false
+                    "length": 128
                 }
             }
         },
@@ -192,8 +178,7 @@
                 },
                 "IsInsured": {
                     "type": "bit",
-                    "length": 1,
-                    "nullable": false
+                    "length": 1
                 },
                 "OccpancyLimit": {
                     "type": "int",
@@ -224,8 +209,7 @@
                 },
                 "State": {
                     "type": "varchar",
-                    "length": 128,
-                    "nullable": false
+                    "length": 128
                 }
             },
             "Residence": {
@@ -261,8 +245,7 @@
                 },
                 "IsInsured": {
                     "type": "bit",
-                    "length": 1,
-                    "nullable": false
+                    "length": 1
                 },
                 "OccpancyLimit": {
                     "type": "int",
