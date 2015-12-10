@@ -210,6 +210,7 @@ class EntityObject
         $obj = new self($this->ctx, $this->connection, $this->query);
         if (!empty($statement) && is_string($statement))
         {
+            // TODO: where validation
             $obj->query['where'][] = $statement;// $obj->connection->encode_str($statement);
         }
         
@@ -347,6 +348,46 @@ class EntityObject
         return false;
     }
     
+    function detach(array $obj)
+    {
+        if (!empty(obj))
+        {
+            $table = $this->query['from'];
+            $schema = $this->ctx->get_table($table);
+            if (!empty($schema))
+            {
+                $columns = $this->ctx->get_table_columns($table);
+                $primary = $this->ctx->get_table_primary_column($table);
+                
+                $values = [];
+                if ($primary != false && isset($obj[$primary]))
+                {
+                    $columns = [$primary];
+                }
+                
+                foreach ($columns as $column)
+                {
+                    if (isset($obj[$column]) && !empty($obj[$column]))
+                    {
+                        $values[] = $column . ' = ' . (is_string($obj[$column]) ? ('"' . $obj[$column] . '"') : $obj[$column]);
+                    }
+                }
+                
+                $sql = 'delete from ' . $table . ' where ' . implode(', ', $values);
+                try
+                {
+                    return $this->connection->query($sql);
+                }
+                catch (Exception $e)
+                {
+                    throw new Exception('Detach on ' . $table . ' has failed for object: ' . $obj, 0, $e);
+                }
+            }
+        }
+        
+        return false;
+    }
+    
     protected function compile()
     {
         $columns = empty($this->query['select']) ? $this->ctx->get_table_columns($this->query['from']) : $this->query['select'];
@@ -426,7 +467,7 @@ class EntityObject
         }
         catch (Exception $e)
         {
-            throw new Exception('Query has failed', 0, $e);
+            throw new Exception('Query on ' . $this->query['from'] . ' has failed', 0, $e);
         }
     }
 }

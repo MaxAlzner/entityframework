@@ -57,25 +57,32 @@ echo json_encode($ctx->p_InsertUpdatePerson(
     'M'
     ), JSON_PRETTY_PRINT) . PHP_EOL;
 
+$person = array(
+    'PersonID' => 4,
+    'AddressID' => 4,
+    'Salutation' => null,
+    'FirstName' => 'Person',
+    'MiddleName' => 'Junior',
+    'LastName' => 'Name',
+    'Cadency' => null,
+    'EmailAddress' => 'new.account.1@web.mail',
+    'PhoneNumber' => '3092143855',
+    'GenderCode' => 'M',
+    'LastUpdated' => date("Y-m-d H:i:s")
+    );
 echo 'before attaching Person' . PHP_EOL;
 echo json_encode($ctx->Person->where('EmailAddress = "new.account.1@web.mail"')->single(), JSON_PRETTY_PRINT) . PHP_EOL;
 echo 'attaching Person' . PHP_EOL;
 echo json_encode($ctx
     ->Person
-    ->attach(array(
-        'PersonID' => 4,
-        'AddressID' => 4,
-        'Salutation' => null,
-        'FirstName' => 'Person',
-        'MiddleName' => 'Junior',
-        'LastName' => 'Name',
-        'Cadency' => null,
-        'EmailAddress' => 'new.account.1@web.mail',
-        'PhoneNumber' => '3092143855',
-        'GenderCode' => 'M',
-        'LastUpdated' => date("Y-m-d H:i:s")
-        )), JSON_PRETTY_PRINT) . PHP_EOL;
+    ->attach($person), JSON_PRETTY_PRINT) . PHP_EOL;
 echo 'after attaching Person' . PHP_EOL;
+echo json_encode($ctx->Person->where('EmailAddress = "new.account.1@web.mail"')->single(), JSON_PRETTY_PRINT) . PHP_EOL;
+echo 'detaching Person' . PHP_EOL;
+echo json_encode($ctx
+    ->Person
+    ->detach($person), JSON_PRETTY_PRINT) . PHP_EOL;
+echo 'after detaching Person' . PHP_EOL;
 echo json_encode($ctx->Person->where('EmailAddress = "new.account.1@web.mail"')->single(), JSON_PRETTY_PRINT) . PHP_EOL;
 
 echo 'attaching Country' . PHP_EOL;
@@ -85,6 +92,13 @@ echo json_encode($ctx
         'Code' => 'UK',
         'Name' => 'United Kingdom'
         )), JSON_PRETTY_PRINT) . PHP_EOL;
+echo 'after attaching Country' . PHP_EOL;
+echo json_encode($ctx->Country->where('Code = "UK"')->single(), JSON_PRETTY_PRINT) . PHP_EOL;
+echo 'detaching Country' . PHP_EOL;
+echo json_encode($ctx
+    ->Country
+    ->detach(array('Name' => 'United Kingdom')), JSON_PRETTY_PRINT) . PHP_EOL;
+echo 'after detaching Country' . PHP_EOL;
 echo json_encode($ctx->Country->where('Code = "UK"')->single(), JSON_PRETTY_PRINT) . PHP_EOL;
 
 ?>
