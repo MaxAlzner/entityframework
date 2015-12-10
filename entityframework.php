@@ -56,7 +56,11 @@ class EntityConnection
         if (!empty($this->sql) && !$this->sql->connect_errno && !empty($statement) && is_string($statement))
         {
             $result = $this->sql->query($statement);
-            $this->sql->next_result();
+            if ($this->sql->more_results())
+            {
+                $this->sql->next_result();
+            }
+            
             if ($result instanceof mysqli_result)
             {
                 $result = $result->fetch_all(MYSQLI_ASSOC);
