@@ -53,7 +53,7 @@ class EntityConnection
     
     public function query($statement, array $schema = null)
     {
-        if (!empty($this->sql) && !empty($statement) && is_string($statement))
+        if (!empty($this->sql) && !$this->sql->connect_errno && !empty($statement) && is_string($statement))
         {
             $result = $this->sql->query($statement);
             $this->sql->next_result();
@@ -77,6 +77,16 @@ class EntityConnection
             }
             
             return $result;
+        }
+        
+        return false;
+    }
+    
+    public function encode_str($value)
+    {
+        if (!empty($this->sql))
+        {
+            return $this->sql->real_escape_string(strval($value));
         }
         
         return false;
@@ -167,7 +177,7 @@ class EntityObject
     
     function select($statement = null)
     {
-        $obj = new EntityObject($this->ctx, $this->connection, $this->query);
+        $obj = new self($this->ctx, $this->connection, $this->query);
         if (!empty($statement) && is_string($statement))
         {
             $obj->query['select'] = [];
@@ -175,7 +185,7 @@ class EntityObject
             $schema = $this->ctx->get_table($this->query['from']);
             foreach ($statement as $column)
             {
-                $column = trim($column);
+                $column = $obj->connection->encode_str(trim($column));
                 if (!array_key_exists($column, $schema))
                 {
                     throw new Exception('Column name is invalid: "' . $column . '"');
@@ -197,10 +207,10 @@ class EntityObject
     
     function where($statement)
     {
-        $obj = new EntityObject($this->ctx, $this->connection, $this->query);
+        $obj = new self($this->ctx, $this->connection, $this->query);
         if (!empty($statement) && is_string($statement))
         {
-            $obj->query['where'][] = $statement;
+            $obj->query['where'][] = $statement;// $obj->connection->encode_str($statement);
         }
         
         return $obj;
@@ -208,14 +218,14 @@ class EntityObject
     
     function orderby($statement, $direction = null)
     {
-        $obj = new EntityObject($this->ctx, $this->connection, $this->query);
+        $obj = new self($this->ctx, $this->connection, $this->query);
         if (!empty($statement) && is_string($statement))
         {
             $statement = explode(',', $statement);
             $schema = $this->ctx->get_table($this->query['from']);
             foreach ($statement as $column)
             {
-                $column = trim($column);
+                $column = $obj->connection->encode_str(trim($column));
                 if (!array_key_exists($column, $schema))
                 {
                     throw new Exception('Column name is invalid: "' . $column . '"');
@@ -231,7 +241,7 @@ class EntityObject
     
     function limit($num)
     {
-        $obj = new EntityObject($this->ctx, $this->connection, $this->query);
+        $obj = new self($this->ctx, $this->connection, $this->query);
         if (is_int($num) || is_string($num))
         {
             $obj->query['limit'] = intval($num);
@@ -242,7 +252,7 @@ class EntityObject
     
     function inject($statement)
     {
-        $obj = new EntityObject($this->ctx, $this->connection, $this->query);
+        $obj = new self($this->ctx, $this->connection, $this->query);
         $current = &$obj->query['include'];
         if (!empty($statement))
         {
@@ -251,6 +261,7 @@ class EntityObject
                 $path = explode('.', $statement);
                 foreach ($path as $navigation)
                 {
+                    $navigation = $obj->connection->encode_str($navigation);
                     if (empty($current[$navigation]))
                     {
                         $current[$navigation] = [];
@@ -271,6 +282,65 @@ class EntityObject
         
         unset($current);
         return $obj;
+    }
+    
+    function attach(array $obj)
+    {
+        if (!empty(obj))
+        {
+            $table = $this->query['from'];
+            $schema = $this->ctx->get_table($table);
+            if (!empty($schema))
+            {
+                $columns = $this->ctx->get_table_columns($table);
+                $primary = $this->ctx->get_table_primary_column($table);
+                foreach ($columns as $column)
+                {
+                    $nullable = isset($schema[$column]['nullable']) ? $schema[$column]['nullable'] : false;
+                    if ($column != $primary && !$nullable && !isset($obj[$column]))
+                    {
+                        throw new Exception('Column is not defined: ' . $column);
+                    }
+                }
+                
+                $values = [];
+                foreach ($columns as $column)
+                {
+                    if (isset($obj[$column]))
+                    {
+                        $values[] = $obj[$column] == null ? 'null' : (is_string($obj[$column]) ? ('"' . $obj[$column] . '"') : $obj[$column]);
+                    }
+                    else
+                    {
+                        $columns = array_diff($columns, [$column]);
+                    }
+                }
+                
+                $columns = array_values($columns);
+                
+                $sql .= 'insert into ' . $table . ' ';
+                $sql .= '(' . implode(', ', $columns) . ') ';
+                $sql .= 'values (' . implode(', ', $values) . ') ';
+                if ($primary != false)
+                {
+                    $sql .= 'on duplicate key update ';
+                    $set = [];
+                    for ($i = 0; $i < count($columns); $i++)
+                    {
+                        $set[] = $columns[$i] . ' = ' . $values[$i];
+                    }
+                    
+                    $sql .= implode(', ', $set);
+                }
+                
+                $sql = trim($sql);
+                // echo $sql . PHP_EOL;
+                $this->connection->query($sql);
+                return true;
+            }
+        }
+        
+        return false;
     }
     
     protected function compile()
@@ -302,6 +372,7 @@ class EntityObject
         try
         {
             $query = $this->compile();
+            // echo $query . PHP_EOL;
             $result = $this->connection->query($query, $this->ctx->get_table($this->query['from']));
             $relationships = $this->ctx->get_table_relationships($this->query['from']);
             if (!empty($relationships) && !empty($this->query['include']))
@@ -486,6 +557,28 @@ class EntityContext
         }
         
         return [];
+    }
+    
+    public function get_table_primary_column($name)
+    {
+        if (!empty($this->schema))
+        {
+            foreach ($this->schema['tables'] as $tableName => $table)
+            {
+                if ($name === $tableName)
+                {
+                    foreach ($table as $columnName => $column)
+                    {
+                        if (array_key_exists('primary', $column) && $column['primary'] == true)
+                        {
+                            return $columnName;
+                        }
+                    }
+                }
+            }
+        }
+        
+        return false;
     }
     
     public function get_table_relationships($tableName)
@@ -798,6 +891,11 @@ class EntityContext
         
         return $str . 's';
     }
+}
+
+function entity_framework($file = null)
+{
+    return new EntityContext($file);
 }
 
 ?>
