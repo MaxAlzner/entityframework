@@ -171,7 +171,7 @@ class EntityObject
         
         $this->ctx = $ctx;
         $this->connection = $connection;
-        $this->query = $query;
+        $this->query = array_merge($this->query, $query);
     }
     
     function __toString()
