@@ -333,10 +333,14 @@ class EntityObject
                     $sql .= implode(', ', $set);
                 }
                 
-                $sql = trim($sql);
-                // echo $sql . PHP_EOL;
-                $this->connection->query($sql);
-                return true;
+                try
+                {
+                    return $this->connection->query(trim($sql));
+                }
+                catch (Exception $e)
+                {
+                    throw new Exception('Attach on ' . $table . ' has failed for object: ' . $obj, 0, $e);
+                }
             }
         }
         
@@ -422,7 +426,7 @@ class EntityObject
         }
         catch (Exception $e)
         {
-            throw new Exception('Query is invalid', 0, $e);
+            throw new Exception('Query has failed', 0, $e);
         }
     }
 }
